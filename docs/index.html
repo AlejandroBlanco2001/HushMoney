@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HushMoney — Architecture</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:               #0d0d14;
+      --surface:          #12121e;
+      --input-bg:         #14142a;
+      --input-border:     #38385a;
+      --forwarder-bg:     #14142a;
+      --forwarder-border: #48486a;
+      --agent-bg:         #2a2a72;
+      --agent-border:     #5050cc;
+      --secondary-bg:     #33339a;
+      --secondary-border: #5555cc;
+      --output-bg:        #0c5445;
+      --output-border:    #1a8868;
+      --sandbox-border:   #44448a;
+      --text:             #e4e4f0;
+      --subtext:          #8888aa;
+      --label:            #aaaacc;
+      --arrow:            #55556a;
+      --arrow-head:       #7777aa;
+      --tag-bg:           #1e1e38;
+      --tag-text:         #8888cc;
+      --font:             'Segoe UI', system-ui, -apple-system, sans-serif;
+      --mono:             'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+      padding: 40px 24px 80px;
+    }
+
+    /* ── Header ───────────────────────────────────────────────── */
+    header {
+      max-width: 960px;
+      margin: 0 auto 56px;
+    }
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #fff;
+    }
+    header h1 span {
+      color: var(--agent-border);
+    }
+    header p {
+      margin-top: 8px;
+      color: var(--subtext);
+      font-size: 1rem;
+      max-width: 560px;
+      line-height: 1.6;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 16px;
+      padding: 4px 10px;
+      background: var(--tag-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 20px;
+      font-size: 0.72rem;
+      color: var(--tag-text);
+      font-family: var(--mono);
+      letter-spacing: 0.3px;
+    }
+    .badge + .badge { margin-left: 6px; }
+
+    /* ── Diagram wrapper ─────────────────────────────────────── */
+    .diagram {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+
+    /* ── Generic box ─────────────────────────────────────────── */
+    .box {
+      border-radius: 10px;
+      padding: 16px 20px;
+      text-align: center;
+    }
+    .box-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #fff;
+      line-height: 1.3;
+    }
+    .box-sub {
+      font-size: 0.75rem;
+      color: var(--label);
+      margin-top: 4px;
+      line-height: 1.5;
+    }
+    .box-tag {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 2px 8px;
+      background: rgba(255,255,255,0.07);
+      border-radius: 4px;
+      font-size: 0.68rem;
+      font-family: var(--mono);
+      color: var(--subtext);
+    }
+
+    /* ── Connector arrows ────────────────────────────────────── */
+    .arrow-down {
+      width: 2px;
+      height: 32px;
+      background: var(--arrow);
+      position: relative;
+      margin: 0 auto;
+    }
+    .arrow-down::after {
+      content: '';
+      position: absolute;
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 7px solid var(--arrow-head);
+    }
+    .arrow-right {
+      width: 24px;
+      height: 2px;
+      background: var(--arrow);
+      position: relative;
+      align-self: center;
+      flex-shrink: 0;
+    }
+    .arrow-right::after {
+      content: '';
+      position: absolute;
+      right: -6px;
+      top: 50%;
+      transform: translateY(-50%);
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+      border-left: 7px solid var(--arrow-head);
+    }
+    .arrow-both {
+      width: 24px;
+      height: 2px;
+      background: var(--arrow);
+      position: relative;
+      align-self: center;
+      flex-shrink: 0;
+    }
+    .arrow-both::before {
+      content: '';
+      position: absolute;
+      left: -6px;
+      top: 50%;
+      transform: translateY(-50%);
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+      border-right: 7px solid var(--arrow-head);
+    }
+    .arrow-both::after {
+      content: '';
+      position: absolute;
+      right: -6px;
+      top: 50%;
+      transform: translateY(-50%);
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+      border-left: 7px solid var(--arrow-head);
+    }
+
+    /* ── Row: input sources ──────────────────────────────────── */
+    .inputs-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      width: 100%;
+    }
+    .input-box {
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+    }
+
+    /* ── Row: fan-in connector ───────────────────────────────── */
+    .fan-in {
+      width: 100%;
+      height: 40px;
+      position: relative;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .fan-in svg {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      overflow: visible;
+    }
+
+    /* ── Row: gateway ────────────────────────────────────────── */
+    .gateway-row {
+      width: 100%;
+    }
+    .gateway-box {
+      background: var(--forwarder-bg);
+      border: 1px solid var(--forwarder-border);
+      width: 100%;
+    }
+    .gateway-box .box-title { font-size: 1.05rem; }
+
+    /* ── Sandbox ─────────────────────────────────────────────── */
+    .sandbox {
+      width: 100%;
+      border: 1.5px dashed var(--sandbox-border);
+      border-radius: 14px;
+      padding: 20px;
+      position: relative;
+    }
+    .sandbox-label {
+      position: absolute;
+      top: -11px;
+      left: 20px;
+      background: var(--bg);
+      padding: 0 8px;
+      font-size: 0.75rem;
+      font-family: var(--mono);
+      color: var(--sandbox-border);
+      letter-spacing: 0.4px;
+    }
+    .sandbox-inner {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 12px;
+      align-items: center;
+    }
+    .agent-box {
+      background: var(--agent-bg);
+      border: 1px solid var(--agent-border);
+      text-align: left;
+      padding: 20px 22px;
+      height: 100%;
+    }
+    .agent-box .box-title {
+      font-size: 1rem;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .agent-detail {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .agent-detail-item {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      font-size: 0.8rem;
+    }
+    .detail-key {
+      color: var(--label);
+      min-width: 68px;
+      flex-shrink: 0;
+    }
+    .detail-val {
+      color: var(--text);
+      line-height: 1.4;
+    }
+    .right-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .ledger-box {
+      background: var(--secondary-bg);
+      border: 1px solid var(--secondary-border);
+    }
+    .egress-box {
+      background: var(--secondary-bg);
+      border: 1px solid var(--secondary-border);
+    }
+    .right-arrows {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      justify-content: space-around;
+      height: 100%;
+      align-items: center;
+    }
+
+    /* ── Row: outputs ────────────────────────────────────────── */
+    .outputs-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      width: 100%;
+    }
+    .output-box {
+      background: var(--output-bg);
+      border: 1px solid var(--output-border);
+    }
+    .output-connectors {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .output-connector {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* ── Legend / Component descriptions ─────────────────────── */
+    .legend {
+      max-width: 960px;
+      margin: 64px auto 0;
+    }
+    .legend h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 24px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--input-border);
+    }
+    .legend-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .legend-card {
+      background: var(--surface);
+      border: 1px solid var(--input-border);
+      border-radius: 10px;
+      padding: 18px 20px;
+    }
+    .legend-card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot-input    { background: var(--input-border); }
+    .dot-forwarder { background: var(--forwarder-border); }
+    .dot-agent    { background: var(--agent-border); }
+    .dot-secondary { background: var(--secondary-border); }
+    .dot-output   { background: var(--output-border); }
+    .legend-name {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: #fff;
+    }
+    .legend-tech {
+      font-size: 0.72rem;
+      font-family: var(--mono);
+      color: var(--tag-text);
+      display: block;
+      margin-top: 2px;
+    }
+    .legend-desc {
+      font-size: 0.82rem;
+      color: var(--subtext);
+      line-height: 1.6;
+    }
+
+    /* ── Data flow steps ─────────────────────────────────────── */
+    .flow {
+      max-width: 960px;
+      margin: 48px auto 0;
+    }
+    .flow h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 24px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--input-border);
+    }
+    .flow-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      position: relative;
+    }
+    .flow-steps::before {
+      content: '';
+      position: absolute;
+      left: 15px;
+      top: 8px;
+      bottom: 8px;
+      width: 2px;
+      background: var(--input-border);
+    }
+    .flow-step {
+      display: flex;
+      gap: 20px;
+      padding: 12px 0;
+      align-items: flex-start;
+    }
+    .flow-num {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--tag-bg);
+      border: 1px solid var(--input-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.78rem;
+      font-family: var(--mono);
+      color: var(--label);
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+    }
+    .flow-content {
+      padding-top: 6px;
+    }
+    .flow-content strong {
+      font-size: 0.88rem;
+      color: #fff;
+      display: block;
+    }
+    .flow-content p {
+      font-size: 0.8rem;
+      color: var(--subtext);
+      margin-top: 3px;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 640px) {
+      .inputs-row { grid-template-columns: 1fr; }
+      .sandbox-inner { grid-template-columns: 1fr; }
+      .outputs-row { grid-template-columns: 1fr; }
+      .output-connectors { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Header ── -->
+  <header>
+    <h1>Hush<span>Money</span></h1>
+    <p>
+      A zero-input, privacy-first expense tracker. Your bank sends the notifications;
+      HushMoney strips the sensitive details and lets your personal AI agent handle the rest —
+      on infrastructure you control.
+    </p>
+    <div style="margin-top:14px; display:flex; flex-wrap:wrap; gap:6px;">
+      <span class="badge">⬡ NVIDIA OpenShell</span>
+      <span class="badge">◈ Hermes Agent</span>
+      <span class="badge">◉ Nebius Serverless</span>
+      <span class="badge">✦ Python 3.12</span>
+    </div>
+  </header>
+
+  <!-- ── Diagram ── -->
+  <div class="diagram">
+
+    <!-- Row 1: Input sources -->
+    <div class="inputs-row" style="width:100%;">
+
+      <div class="box input-box">
+        <div class="box-title">Bank Emails</div>
+        <div class="box-sub">
+          Your bank's notification emails, forwarded automatically from Gmail or Outlook
+          to your private HushMoney inbox.
+        </div>
+        <span class="box-tag">Cloudflare Email Worker</span>
+      </div>
+
+      <div class="box input-box">
+        <div class="box-title">Bank SMS</div>
+        <div class="box-sub">
+          Transaction alerts sent by your bank via SMS, relayed to Telegram
+          using a one-tap Android forwarder app.
+        </div>
+        <span class="box-tag">SMS → Telegram relay</span>
+      </div>
+
+      <div class="box input-box">
+        <div class="box-title">Telegram Messages</div>
+        <div class="box-sub">
+          Voice notes, photos of receipts, or typed messages forwarded to your
+          private HushMoney bot.
+        </div>
+        <span class="box-tag">Telegram Bot API</span>
+      </div>
+
+    </div>
+
+    <!-- Fan-in connector -->
+    <div class="fan-in">
+      <svg viewBox="0 0 960 40" preserveAspectRatio="none">
+        <!-- Three lines converging to center -->
+        <line x1="160" y1="0" x2="480" y2="34" stroke="#44445a" stroke-width="1.5"/>
+        <line x1="480" y1="0" x2="480" y2="34" stroke="#44445a" stroke-width="1.5"/>
+        <line x1="800" y1="0" x2="480" y2="34" stroke="#44445a" stroke-width="1.5"/>
+        <!-- Arrowhead -->
+        <polygon points="474,30 486,30 480,40" fill="#6666aa"/>
+      </svg>
+    </div>
+
+    <!-- Row 2: Ingestion Gateway (the Forwarder) -->
+    <div class="gateway-row">
+      <div class="box gateway-box">
+        <div class="box-title">HushMoney Forwarder — Ingestion Gateway</div>
+        <div class="box-sub">
+          Receives raw notifications from all channels. Drops OTPs, account numbers,
+          and all other sensitive details. Emits a clean, minimal payload: amount,
+          merchant, date, transaction type. Stateless — holds nothing.
+        </div>
+        <span class="box-tag">Python 3.12 · channels/ · sanitizer/ · dispatcher/</span>
+      </div>
+    </div>
+
+    <!-- Arrow down -->
+    <div class="arrow-down" style="height:36px;"></div>
+
+    <!-- Row 3: OpenShell Sandbox -->
+    <div class="sandbox">
+      <span class="sandbox-label">NVIDIA OpenShell Sandbox — policy-governed execution</span>
+
+      <div class="sandbox-inner">
+
+        <!-- Hermes Agent -->
+        <div class="box agent-box" style="border-radius:10px;">
+          <div class="box-title">Hermes Agent</div>
+          <div class="box-sub" style="text-align:left; margin-bottom:0;">NousResearch · self-improving personal AI</div>
+          <div class="agent-detail">
+            <div class="agent-detail-item">
+              <span class="detail-key">Skills</span>
+              <span class="detail-val">parse transactions, reconcile categories, ask user about cash ops</span>
+            </div>
+            <div class="agent-detail-item">
+              <span class="detail-key">Memory</span>
+              <span class="detail-val">learned rules — your merchant patterns, preferred categories</span>
+            </div>
+            <div class="agent-detail-item">
+              <span class="detail-key">Scheduled</span>
+              <span class="detail-val">daily, weekly, and monthly summaries</span>
+            </div>
+            <div class="agent-detail-item">
+              <span class="detail-key">Setup</span>
+              <span class="detail-val">one-time guided setup skill — runs on first launch, never again</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bidirectional arrows to right column -->
+        <div class="right-arrows">
+          <div class="arrow-both" style="width:20px;"></div>
+          <div style="height:24px;"></div>
+          <div class="arrow-right" style="width:20px;"></div>
+        </div>
+
+        <!-- Right stack: Ledger + Egress -->
+        <div class="right-stack">
+          <div class="box ledger-box" style="border-radius:10px;">
+            <div class="box-title">Transaction Ledger</div>
+            <div class="box-sub">
+              Your private financial database. Every expense, category, description,
+              and debt entry stored on your own server — never in the cloud.
+            </div>
+            <span class="box-tag">SQLite · local to your deployment</span>
+          </div>
+
+          <div class="box egress-box" style="border-radius:10px;">
+            <div class="box-title">Network Egress Policy</div>
+            <div class="box-sub">
+              OpenShell enforces which hosts the agent can reach. Only the
+              Nebius inference endpoint and Telegram API are on the allowlist.
+              The agent cannot call arbitrary URLs.
+            </div>
+            <span class="box-tag">OpenShell · allowlisted hosts only</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Output connectors -->
+    <div class="output-connectors">
+      <div class="output-connector"><div class="arrow-down" style="height:32px;"></div></div>
+      <div class="output-connector"><div class="arrow-down" style="height:32px;"></div></div>
+    </div>
+
+    <!-- Row 4: Outputs -->
+    <div class="outputs-row">
+
+      <div class="box output-box">
+        <div class="box-title">Nebius Serverless — NVIDIA Inference</div>
+        <div class="box-sub">
+          The AI brains. Hermes calls NVIDIA open models hosted on Nebius to
+          understand transactions, infer categories, generate summaries, and
+          decide when to ask you a question.
+        </div>
+        <span class="box-tag">Nano · Super · Ultra model tiers</span>
+      </div>
+
+      <div class="box output-box">
+        <div class="box-title">Telegram Notification Bot</div>
+        <div class="box-sub">
+          Your personal bot sends you questions about cash operations, confirms
+          ambiguous transactions, and delivers your daily and weekly summaries.
+          Outbound only — no raw financial data ever leaves the sandbox.
+        </div>
+        <span class="box-tag">your bot · your token · your chat ID</span>
+      </div>
+
+    </div>
+
+  </div><!-- /diagram -->
+
+  <!-- ── Component legend ── -->
+  <div class="legend">
+    <h2>Components</h2>
+    <div class="legend-grid">
+
+      <div class="legend-card">
+        <div class="legend-card-header">
+          <div class="legend-dot dot-input"></div>
+          <div>
+            <div class="legend-name">Bank Emails</div>
+            <span class="legend-tech">Cloudflare Email Worker</span>
+          </div>
+        </div>
+        <p class="legend-desc">
+          You add a single forwarding rule in Gmail or Outlook. Bank notification emails
+          are silently routed to your deployment's private address. Cloudflare converts
+          the email to an HTTP POST and sends it to the Forwarder. No credentials shared,
+          no IMAP server to configure.
+        </p>
+      </div>
+
+      <div class="legend-card">
+        <div class="legend-card-header">
+          <div class="legend-dot dot-input"></div>
+          <div>
+            <div class="legend-name">Bank SMS</div>
+            <span class="legend-tech">Android SMS Forwarder → Telegram Bot</span>
+          </div>
+        </div>
+        <p class="legend-desc">
+          A lightweight Android app (or Tasker rule) automatically forwards bank SMS
+          messages to your private Telegram bot. iOS users can forward messages manually
+          or switch to email alerts in their banking app settings.
+        </p>
+      </div>
+
+      <div class="legend-card">
+        <div class="legend-card-header">
+          <div class="legend-dot dot-input"></div>
+          <div>
+            <div class="legend-name">Telegram Messages</div>
+            <span class="legend-tech">Telegram Bot API</span>
+          </div>
+        </div>
+        <p class="legend-desc">
+          You create your own private bot via @BotFather — one command, takes two minutes.
+          Forward bank notifications, photos of receipts, or voice notes directly to it.
+          You own the bot token; nobody else can read its messages.
+        </p>
+      </div>
+
+      <div class="legend-card">
+        <div class="legend-card-header">
+          <div class="legend-dot dot-forwarder"></div>
+          <div>
+            <div class="legend-name">HushMoney Forwarder</div>
+            <span class="legend-tech">Python 3.12 · channels/ sanitizer/ dispatcher/</span>
+          </div>
+        </div>
+        <p class="legend-desc">
+          The privacy boundary of the entire system. Every incoming message passes through
+          the sanitizer before anything else happens. OTPs, account suffixes, card numbers,
+          and full names are stripped here. Hermes never sees raw financial data.
+          The Forwarder holds no state and no database.
+        </p>
+      </div>
+
+      <div class="legend-card">
+        <div class="legend-card-header">
+          <div class="legend-dot dot-agent"></div>
+          <div>
+            <div class="legend-name">Hermes Agent</div>
+            <span class="legend-tech">NousResearch · github.com/NousResearch/hermes-agent</span>
+          </div>
+        </div>
+        <p class="legend-desc">
+          A self-improving personal AI agent that builds skills from experience. Hermes
+          receives clean transaction payloads, categorizes them, stores them in the Ledger,
+          and sends you summaries or questions. It runs inside the NVIDIA OpenShell sandbox
+          so it can only reach the systems it's explicitly allowed to.
+        </p>
+      </div>
+
+      <div class="legend-card">
+        <div class="legend-card-header">
+          <div class="legend-dot dot-secondary"></div>
+          <div>
+            <div class="legend-name">Transaction Ledger</div>
+            <span class="legend-tech">SQLite · local to your Nebius volume</span>
+          </div>
+        </div>
+        <p class="legend-desc">
+          A single SQLite file on your server that holds every expense, category,
+          description, and debt entry. No third-party database. No cloud sync.
+          If you want a backup, copy the file. If you want to inspect it, open it
+          with any SQLite viewer.
+        </p>
+      </div>
+
+      <div class="legend-card">
+        <div class="legend-card-header">
+          <div class="legend-dot dot-secondary"></div>
+          <div>
+            <div class="legend-name">Network Egress Policy</div>
+            <span class="legend-tech">NVIDIA OpenShell · config/openshell/policy.yaml</span>
+          </div>
+        </div>
+        <p class="legend-desc">
+          OpenShell enforces a kernel-level allowlist of hosts the agent can reach.
+          Only the Nebius inference endpoint and the Telegram Bot API are permitted.
+          Even if Hermes is tricked into making an unexpected network call, OpenShell
+          blocks it before it leaves the sandbox.
+        </p>
+      </div>
+
+      <div class="legend-card">
+        <div class="legend-card-header">
+          <div class="legend-dot dot-output"></div>
+          <div>
+            <div class="legend-name">Nebius Serverless — NVIDIA Inference</div>
+            <span class="legend-tech">Nebius AI Cloud · NVIDIA open models</span>
+          </div>
+        </div>
+        <p class="legend-desc">
+          Hermes calls NVIDIA open models on Nebius Serverless to power its reasoning:
+          understanding what a transaction means, picking the right category, generating
+          a natural-language summary, and deciding whether to ask you a question.
+          Nano for fast classification, Super and Ultra for richer reasoning tasks.
+        </p>
+      </div>
+
+      <div class="legend-card">
+        <div class="legend-card-header">
+          <div class="legend-dot dot-output"></div>
+          <div>
+            <div class="legend-name">Telegram Notification Bot</div>
+            <span class="legend-tech">Telegram Bot API · outbound only</span>
+          </div>
+        </div>
+        <p class="legend-desc">
+          The same bot you use to send messages in is also used by Hermes to reach you.
+          It sends cash operation reminders ("You withdrew $100 — what was it for?"),
+          ambiguous transaction questions, and your daily, weekly, and monthly summaries.
+          No raw financial data is included in these messages.
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Data flow walkthrough ── -->
+  <div class="flow">
+    <h2>How a transaction flows through the system</h2>
+    <div class="flow-steps">
+
+      <div class="flow-step">
+        <div class="flow-num">1</div>
+        <div class="flow-content">
+          <strong>Bank notification arrives</strong>
+          <p>Your bank sends an email or SMS: "Debit of $42.50 at Starbucks — account ending 1234. OTP: 882910"</p>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-num">2</div>
+        <div class="flow-content">
+          <strong>Routed to HushMoney</strong>
+          <p>Gmail's forwarding rule sends it to your Cloudflare Email Worker address, or your Android SMS relay sends it to your Telegram bot.</p>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-num">3</div>
+        <div class="flow-content">
+          <strong>Forwarder sanitizes</strong>
+          <p>The Forwarder strips the account suffix, the OTP, and any other sensitive detail. What remains: <code style="font-family:var(--mono); font-size:0.8em; color:var(--label)">{ amount: 42.50, merchant: "Starbucks", date: "...", type: "debit" }</code></p>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-num">4</div>
+        <div class="flow-content">
+          <strong>Hermes receives the clean payload</strong>
+          <p>The Forwarder POSTs the sanitized record to Hermes. This is the only thing Hermes ever sees — no OTPs, no account numbers.</p>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-num">5</div>
+        <div class="flow-content">
+          <strong>Agent runs skills</strong>
+          <p>Hermes calls the <em>expense_tracker</em> skill to store the transaction, then the <em>categorizer</em> skill to tag it (e.g., "dining"). Both skills read and write the local SQLite ledger.</p>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-num">6</div>
+        <div class="flow-content">
+          <strong>Inference via Nebius</strong>
+          <p>The categorizer calls an NVIDIA model on Nebius Serverless to determine the category. The OpenShell egress policy ensures this is the only external call the agent can make.</p>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-num">7</div>
+        <div class="flow-content">
+          <strong>Done — or a question for cash ops</strong>
+          <p>For digital transactions, nothing else happens. For cash withdrawals, Hermes sends your Telegram bot a message: "Cash withdrawal of $100 detected. What was it for?" You reply optionally.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</body>
+</html>

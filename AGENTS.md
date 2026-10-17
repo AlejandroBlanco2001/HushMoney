@@ -23,13 +23,21 @@ hushmoney/
 │       ├── security.md        ← PII/OTP rules (read when touching forwarder/ or config/)
 │       └── git.md             ← branch and commit conventions
 ├── forwarder/                 ← Python 3.12 — receives, sanitizes, dispatches messages
+│   └── src/
+│       ├── channels/
+│       │   ├── email.py       ← HTTP POST from Cloudflare Email Worker
+│       │   └── telegram.py    ← Telegram Bot API (user's own bot)
+│       ├── sanitizer/         ← strip OTP, account numbers, PII
+│       └── dispatcher/        ← POST clean payload to Hermes
 ├── skills/                    ← custom Hermes skills loaded by the agent at runtime
+│   ├── setup/                 ← one-time guided setup via Telegram (runs once)
 │   ├── expense_tracker/
 │   ├── categorizer/
 │   ├── debt_tracker/
 │   └── summaries/
 └── config/                    ← Hermes config, OpenShell policy, system prompts
     ├── hermes.yaml
+    ├── cloudflare/            ← Email Worker script + wrangler config
     ├── openshell/
     └── prompts/
 ```
@@ -64,6 +72,7 @@ These must not be violated under any circumstances:
 3. **Skills live at the edge.** New capabilities go into `skills/`, not into Hermes core. This mirrors Hermes's own architecture principle: keep the core narrow.
 4. **Hermes config is the source of truth for behavior.** Do not use environment variables for non-secret configuration; put it in `config/hermes.yaml`.
 5. **The forwarder is stateless.** It receives, sanitizes, and dispatches. It does not store, retry-queue, or make decisions about transactions.
+6. **Two channels in, one channel out.** The forwarder's only input channels are Cloudflare Email Workers (email) and Telegram Bot API (SMS relay + messaging). No IMAP, no Twilio, no OAuth flows.
 
 ## Routing Table
 
