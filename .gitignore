@@ -1,0 +1,36 @@
+# Secrets
+.env
+*.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.pyright/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# SQLite
+*.db
+*.sqlite
+*.sqlite3
+
+# Editor
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/

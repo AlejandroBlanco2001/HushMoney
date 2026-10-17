@@ -1,0 +1,33 @@
+# Hermes Agent configuration for HushMoney
+# Non-secret behavior lives here. Secrets go in environment variables.
+# See docs/rules/security.md for what must NOT appear in this file.
+
+agent:
+  name: hushmoney
+  # NVIDIA open model via Nebius — update with specific model ID when confirmed
+  model: nvidia/open-model-placeholder
+  skills_path: ../skills
+
+database:
+  path: ~/.hermes/hushmoney.db
+
+gateway:
+  telegram:
+    enabled: true
+    # TELEGRAM_BOT_TOKEN must be set as an environment variable
+    # Only sends to the configured chat_id — never dynamically resolved
+    # TELEGRAM_CHAT_ID must be set as an environment variable
+
+notifications:
+  cash_operations_only: true
+
+summaries:
+  daily:
+    enabled: true
+    # schedule: cron expression — to be configured
+  weekly:
+    enabled: true
+    day: monday
+  monthly:
+    enabled: true
+    day: 1
