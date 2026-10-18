@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HushMoney — Mapa de Dependencias</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #0d0d14;
+      --surface:    #12121e;
+      --border:     #2a2a3a;
+      --e1:         #0075ca;
+      --e1-dim:     #00396a;
+      --e1-text:    #60b8ff;
+      --e2:         #5050cc;
+      --e2-dim:     #28287a;
+      --e2-text:    #a090ff;
+      --e3:         #1a8868;
+      --e3-dim:     #0c4535;
+      --e3-text:    #4ecfa8;
+      --critical:   #e8a020;
+      --critical-dim: #5a3a00;
+      --text:       #e4e4f0;
+      --subtext:    #7777aa;
+      --label:      #aaaacc;
+      --phase-bg:   #0f0f1c;
+      --font:       'Segoe UI', system-ui, -apple-system, sans-serif;
+      --mono:       'Cascadia Code', 'Fira Code', monospace;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+      padding: 32px 24px 80px;
+      overflow-x: auto;
+    }
+
+    /* ── Header ── */
+    header {
+      max-width: 1400px;
+      margin: 0 auto 40px;
+    }
+    header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #fff;
+    }
+    header h1 span { color: #a090ff; }
+    header p {
+      margin-top: 8px;
+      color: var(--subtext);
+      font-size: 0.9rem;
+      max-width: 680px;
+      line-height: 1.6;
+    }
+
+    /* ── Legend ── */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 0.78rem;
+      color: var(--label);
+    }
+    .legend-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot-e1 { background: var(--e1); }
+    .dot-e2 { background: var(--e2); }
+    .dot-e3 { background: var(--e3); }
+    .dot-cp { background: var(--critical); }
+
+    /* ── Board ── */
+    .board {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(230px, 1fr));
+      gap: 16px;
+      max-width: 1400px;
+      margin: 0 auto;
+      min-width: 1100px;
+    }
+
+    /* ── Phase column ── */
+    .phase {
+      background: var(--phase-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0 0 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .phase-header {
+      padding: 14px 16px 12px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 14px;
+    }
+    .phase-number {
+      font-size: 0.65rem;
+      font-family: var(--mono);
+      color: var(--subtext);
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+    .phase-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #fff;
+      margin-top: 3px;
+    }
+    .phase-note {
+      font-size: 0.72rem;
+      color: var(--subtext);
+      margin-top: 4px;
+    }
+    .phase-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 0 12px;
+    }
+
+    /* ── Team separator ── */
+    .team-sep {
+      font-size: 0.65rem;
+      font-family: var(--mono);
+      letter-spacing: 0.6px;
+      padding: 6px 12px 2px;
+      text-transform: uppercase;
+    }
+    .sep-e1 { color: var(--e1-text); }
+    .sep-e2 { color: var(--e2-text); }
+    .sep-e3 { color: var(--e3-text); }
+
+    /* ── Issue card ── */
+    .card {
+      border-radius: 8px;
+      padding: 11px 13px;
+      border-left: 3px solid transparent;
+      position: relative;
+    }
+    .card.e1 {
+      background: color-mix(in srgb, var(--e1-dim) 60%, var(--surface));
+      border-left-color: var(--e1);
+    }
+    .card.e2 {
+      background: color-mix(in srgb, var(--e2-dim) 60%, var(--surface));
+      border-left-color: var(--e2);
+    }
+    .card.e3 {
+      background: color-mix(in srgb, var(--e3-dim) 60%, var(--surface));
+      border-left-color: var(--e3);
+    }
+    .card.critical {
+      border-left-color: var(--critical);
+      box-shadow: 0 0 0 1px var(--critical-dim);
+    }
+    .card-issue {
+      font-size: 0.68rem;
+      font-family: var(--mono);
+      color: var(--subtext);
+      margin-bottom: 4px;
+    }
+    .card.critical .card-issue { color: var(--critical); }
+    .card-title {
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--text);
+      line-height: 1.4;
+    }
+    .card-requires {
+      margin-top: 7px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .req-badge {
+      font-size: 0.65rem;
+      font-family: var(--mono);
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.07);
+      color: var(--subtext);
+      border: 1px solid var(--border);
+    }
+    .critical-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.62rem;
+      font-family: var(--mono);
+      color: var(--critical);
+      margin-top: 6px;
+      opacity: 0.8;
+    }
+
+    /* ── Arrow between phases ── */
+    .phase-arrow {
+      display: none; /* handled by grid gap */
+    }
+
+    /* ── Critical path callout ── */
+    .critical-path {
+      max-width: 1400px;
+      margin: 32px auto 0;
+      background: color-mix(in srgb, var(--critical-dim) 50%, var(--surface));
+      border: 1px solid var(--critical);
+      border-radius: 10px;
+      padding: 16px 20px;
+    }
+    .critical-path h3 {
+      font-size: 0.82rem;
+      font-family: var(--mono);
+      color: var(--critical);
+      letter-spacing: 0.4px;
+      margin-bottom: 10px;
+    }
+    .cp-chain {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+    .cp-node {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--critical-dim);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      font-family: var(--mono);
+      color: var(--text);
+    }
+    .cp-arrow {
+      color: var(--critical);
+      font-size: 0.9rem;
+    }
+    .cp-desc {
+      font-size: 0.78rem;
+      color: var(--subtext);
+      margin-top: 10px;
+      line-height: 1.6;
+    }
+
+    /* ── Unblocked callout ── */
+    .unblocked {
+      max-width: 1400px;
+      margin: 16px auto 0;
+      background: color-mix(in srgb, var(--e3-dim) 40%, var(--surface));
+      border: 1px solid var(--e3);
+      border-radius: 10px;
+      padding: 14px 20px;
+      font-size: 0.8rem;
+      color: var(--label);
+      line-height: 1.7;
+    }
+    .unblocked strong { color: var(--e3-text); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Hush<span>Money</span> — Mapa de Dependencias</h1>
+  <p>
+    Orden recomendado para trabajar los issues sin bloquearse entre equipos.
+    Las tarjetas doradas están en el camino crítico — un retraso ahí retrasa el demo.
+  </p>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot dot-e1"></div> Equipo 1 · Forwarder</div>
+    <div class="legend-item"><div class="legend-dot dot-e2"></div> Equipo 2 · Hermes &amp; LLM</div>
+    <div class="legend-item"><div class="legend-dot dot-e3"></div> Equipo 3 · Pitch &amp; Demo</div>
+    <div class="legend-item"><div class="legend-dot dot-cp"></div> Camino crítico</div>
+  </div>
+</header>
+
+<div class="board">
+
+  <!-- ── FASE 0 ── -->
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-number">Fase 0</div>
+      <div class="phase-title">Arrancar ya</div>
+      <div class="phase-note">Sin dependencias — todo en paralelo</div>
+    </div>
+    <div class="phase-cards">
+
+      <div class="team-sep sep-e1">Equipo 1</div>
+
+      <div class="card e1 critical">
+        <div class="card-issue">#24 · crítico</div>
+        <div class="card-title">Cloudflare Email Worker</div>
+        <div class="critical-badge">⬡ camino crítico</div>
+      </div>
+
+      <div class="card e1 critical">
+        <div class="card-issue">#27 · crítico</div>
+        <div class="card-title">Adaptador canal Telegram</div>
+        <div class="critical-badge">⬡ camino crítico</div>
+      </div>
+
+      <div class="card e1">
+        <div class="card-issue">#38</div>
+        <div class="card-title">Fixtures Bancolombia faltantes</div>
+      </div>
+
+      <div class="card e1">
+        <div class="card-issue">#39</div>
+        <div class="card-title">Fixtures Banco de Bogotá</div>
+      </div>
+
+      <div class="card e1">
+        <div class="card-issue">#40</div>
+        <div class="card-title">Fixtures BBVA Colombia</div>
+      </div>
+
+      <div class="card e1">
+        <div class="card-issue">#41</div>
+        <div class="card-title">Fixtures Rappipay (banco desconocido del demo)</div>
+      </div>
+
+      <div class="team-sep sep-e2">Equipo 2</div>
+
+      <div class="card e2 critical">
+        <div class="card-issue">#22 · crítico</div>
+        <div class="card-title">Seleccionar modelo NVIDIA en Nebius</div>
+        <div class="critical-badge">⬡ camino crítico</div>
+      </div>
+
+      <div class="card e2 critical">
+        <div class="card-issue">#23 · crítico</div>
+        <div class="card-title">Docker Compose Forwarder + Hermes</div>
+        <div class="critical-badge">⬡ camino crítico</div>
+      </div>
+
+      <div class="card e2">
+        <div class="card-issue">#25</div>
+        <div class="card-title">Política sandbox OpenShell</div>
+      </div>
+
+      <div class="card e2 critical">
+        <div class="card-issue">#31 · crítico</div>
+        <div class="card-title">Inicializar esquema SQLite</div>
+        <div class="critical-badge">⬡ camino crítico</div>
+      </div>
+
+      <div class="team-sep sep-e3">Equipo 3</div>
+
+      <div class="card e3">
+        <div class="card-issue">#45</div>
+        <div class="card-title">Preparar pitch deck</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── FASE 1 ── -->
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-number">Fase 1</div>
+      <div class="phase-title">Pipeline y base de datos</div>
+      <div class="phase-note">Cuando Fase 0 esté lista</div>
+    </div>
+    <div class="phase-cards">
+
+      <div class="team-sep sep-e1">Equipo 1</div>
+
+      <div class="card e1 critical">
+        <div class="card-issue">#26 · crítico</div>
+        <div class="card-title">Adaptador canal email</div>
+        <div class="card-requires">
+          <span class="req-badge">← #24</span>
+        </div>
+        <div class="critical-badge">⬡ camino crítico</div>
+      </div>
+
+      <div class="card e1 critical">
+        <div class="card-issue">#28 · crítico</div>
+        <div class="card-title">Sanitizador con runner parametrizado</div>
+        <div class="card-requires">
+          <span class="req-badge">← #24</span>
+          <span class="req-badge">← #27</span>
+          <span class="req-badge">← #38–41</span>
+        </div>
+        <div class="critical-badge">⬡ camino crítico</div>
+      </div>
+
+      <div class="team-sep sep-e2">Equipo 2</div>
+
+      <div class="card e2 critical">
+        <div class="card-issue">#33 · crítico</div>
+        <div class="card-title">Skill expense_tracker</div>
+        <div class="card-requires">
+          <span class="req-badge">← #31</span>
+        </div>
+        <div class="critical-badge">⬡ camino crítico</div>
+      </div>
+
+      <div class="card e2">
+        <div class="card-issue">#35</div>
+        <div class="card-title">Skill debt_tracker</div>
+        <div class="card-requires">
+          <span class="req-badge">← #31</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── FASE 2 ── -->
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-number">Fase 2</div>
+      <div class="phase-title">Dispatch y skills core</div>
+      <div class="phase-note">Cuando Fase 1 esté lista</div>
+    </div>
+    <div class="phase-cards">
+
+      <div class="team-sep sep-e1">Equipo 1</div>
+
+      <div class="card e1 critical">
+        <div class="card-issue">#29 · crítico</div>
+        <div class="card-title">Dispatcher con health check y reintento</div>
+        <div class="card-requires">
+          <span class="req-badge">← #28</span>
+          <span class="req-badge">← #23</span>
+        </div>
+        <div class="critical-badge">⬡ camino crítico</div>
+      </div>
+
+      <div class="card e1">
+        <div class="card-issue">#30</div>
+        <div class="card-title">Endpoint /confirm para código de Gmail</div>
+        <div class="card-requires">
+          <span class="req-badge">← #26</span>
+        </div>
+      </div>
+
+      <div class="team-sep sep-e2">Equipo 2</div>
+
+      <div class="card e2 critical">
+        <div class="card-issue">#34 · crítico</div>
+        <div class="card-title">Skill categorizador + dataset dorado + evals</div>
+        <div class="card-requires">
+          <span class="req-badge">← #22</span>
+          <span class="req-badge">← #33</span>
+        </div>
+        <div class="critical-badge">⬡ camino crítico</div>
+      </div>
+
+      <div class="card e2">
+        <div class="card-issue">#36</div>
+        <div class="card-title">Skill resúmenes + juez LLM</div>
+        <div class="card-requires">
+          <span class="req-badge">← #33</span>
+          <span class="req-badge">← #35</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── FASE 3 ── -->
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-number">Fase 3</div>
+      <div class="phase-title">Skills avanzadas y evals</div>
+      <div class="phase-note">Cuando Fase 2 esté lista</div>
+    </div>
+    <div class="phase-cards">
+
+      <div class="team-sep sep-e2">Equipo 2</div>
+
+      <div class="card e2">
+        <div class="card-issue">#32</div>
+        <div class="card-title">Skill setup (Playwright MCP + HITL)</div>
+        <div class="card-requires">
+          <span class="req-badge">← #24</span>
+          <span class="req-badge">← #26</span>
+          <span class="req-badge">← #27</span>
+          <span class="req-badge">← #28</span>
+          <span class="req-badge">← #29</span>
+          <span class="req-badge">← #30</span>
+          <span class="req-badge">← #31</span>
+        </div>
+      </div>
+
+      <div class="card e2 critical">
+        <div class="card-issue">#37 · crítico</div>
+        <div class="card-title">Skill bank_learning (reactivo y proactivo)</div>
+        <div class="card-requires">
+          <span class="req-badge">← #22</span>
+          <span class="req-badge">← #28</span>
+          <span class="req-badge">← #29</span>
+        </div>
+        <div class="critical-badge">⬡ camino crítico</div>
+      </div>
+
+      <div class="card e2">
+        <div class="card-issue">#42</div>
+        <div class="card-title">Pipeline de evals del categorizador en CI</div>
+        <div class="card-requires">
+          <span class="req-badge">← #34</span>
+        </div>
+      </div>
+
+      <div class="team-sep sep-e3">Equipo 3</div>
+
+      <div class="card e3">
+        <div class="card-issue">#43</div>
+        <div class="card-title">Preparar entorno de demo en Nebius</div>
+        <div class="card-requires">
+          <span class="req-badge">← Fase 2 completa</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── DEMO ── -->
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-number">Demo</div>
+      <div class="phase-title">Ensayo y pitch</div>
+      <div class="phase-note">Última fase antes de presentar</div>
+    </div>
+    <div class="phase-cards">
+
+      <div class="team-sep sep-e2">Equipo 2</div>
+
+      <div class="card e2">
+        <div class="card-issue">#25</div>
+        <div class="card-title">Verificar política OpenShell con el entorno real</div>
+        <div class="card-requires">
+          <span class="req-badge">← #43</span>
+        </div>
+      </div>
+
+      <div class="team-sep sep-e3">Equipo 3</div>
+
+      <div class="card e3 critical">
+        <div class="card-issue">#44 · crítico</div>
+        <div class="card-title">Escribir y ensayar script del demo</div>
+        <div class="card-requires">
+          <span class="req-badge">← #43</span>
+          <span class="req-badge">← #37</span>
+        </div>
+        <div class="critical-badge">⬡ camino crítico</div>
+      </div>
+
+      <div class="card e3">
+        <div class="card-issue">#45</div>
+        <div class="card-title">Pitch deck — revisión final con demo incorporado</div>
+        <div class="card-requires">
+          <span class="req-badge">← #44</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /board -->
+
+<!-- ── Critical path ── -->
+<div class="critical-path">
+  <h3>⬡ Camino crítico — cualquier retraso aquí retrasa el demo</h3>
+  <div class="cp-chain">
+    <div class="cp-node">#22 Modelo</div><div class="cp-arrow">→</div>
+    <div class="cp-node">#24 Cloudflare</div><div class="cp-arrow">+</div>
+    <div class="cp-node">#27 Telegram</div><div class="cp-arrow">→</div>
+    <div class="cp-node">#28 Sanitizador</div><div class="cp-arrow">→</div>
+    <div class="cp-node">#29 Dispatcher</div><div class="cp-arrow">+</div>
+    <div class="cp-node">#31 Schema</div><div class="cp-arrow">→</div>
+    <div class="cp-node">#33 expense_tracker</div><div class="cp-arrow">→</div>
+    <div class="cp-node">#34 Categorizador</div><div class="cp-arrow">→</div>
+    <div class="cp-node">#37 bank_learning</div><div class="cp-arrow">→</div>
+    <div class="cp-node">#43 Entorno demo</div><div class="cp-arrow">→</div>
+    <div class="cp-node">#44 Script demo</div>
+  </div>
+  <div class="cp-desc">
+    El issue <strong>#22 (modelo NVIDIA)</strong> es el primer cuello de botella real — desbloquea el categorizador y el bank_learning.
+    Mientras se resuelve, Equipo 1 puede avanzar en paralelo todo el pipeline del Forwarder y los fixtures de bancos sin esperar a nadie.
+  </div>
+</div>
+
+<!-- ── Arrancar ya ── -->
+<div class="unblocked">
+  <strong>¿Qué arrancar hoy mismo, en paralelo?</strong><br>
+  E1: #24 Cloudflare Worker · #27 Telegram adapter · #38 #39 #40 #41 fixtures de bancos<br>
+  E2: #22 Modelo NVIDIA · #23 Docker Compose · #31 Schema SQLite<br>
+  E3: #45 Pitch deck (estructura y narrativa, sin esperar el demo)
+</div>
+
+</body>
+</html>
