@@ -10,6 +10,7 @@ agent:
 
 database:
   path: ~/.hermes/hushmoney.db
+  schema: config/schema.sql   # applied on first run if db does not exist
 
 gateway:
   telegram:

@@ -116,8 +116,112 @@ The forwarder holds no state, no database, no retry queue. If dispatch fails, th
 | `categorizer` | Classify transaction into a spending category |
 | `debt_tracker` | Manage list of people owed / owing |
 | `summaries` | Generate daily, weekly, monthly rollups on schedule or on demand |
+| `bank_learning` | Learn new bank notification formats from user-provided samples; fallback when sanitizer has no pattern match |
 
 All skills run inside the NVIDIA OpenShell sandbox. Policy at `config/openshell/policy.yaml`.
+
+### Bank Learning Skill (`skills/bank_learning/`)
+
+The sanitizer uses a two-layer fallback to match incoming messages:
+
+```
+Message arrives at sanitizer
+        │
+        ▼
+① Community patterns   ← compiled from tests/fixtures/ at deploy time
+        │ no match
+        ▼
+② Hermes learned       ← patterns stored in SQLite, discovered at runtime
+        │ no match
+        ▼
+  bank_learning skill  ← asks user, infers pattern, updates layer ②
+```
+
+The skill operates in two modes:
+
+**Reactive** — triggered automatically when both layers fail:
+
+```
+Sanitizer: no pattern match → triggers bank_learning skill
+
+Hermes → Telegram: "I got a notification I couldn't parse.
+                    Which bank sent it?"
+User: "Davivienda"
+
+Hermes: uses NVIDIA model to infer structure from the raw message
+        (this is the ONE place in the system where Hermes sees
+        pre-sanitization content — see security exception below)
+
+Hermes → Telegram: "I think this is a debit purchase of $85,000
+                    at Éxito on 14/09/2026. Correct?"
+User: "yes" / "no, it's a transfer"
+
+Hermes: stores confirmed pattern in SQLite (layer ②)
+        discards the raw message immediately
+        applies pattern — transaction is processed normally
+```
+
+**Proactive** — user-initiated when adding a new bank before any notifications arrive:
+
+```
+User → Telegram: "hermes add-bank"
+
+Hermes: "Which bank? Which country?"
+User: "Davivienda, Colombia"
+
+Hermes: "Send me 2–3 sample notifications from Davivienda.
+         Redact sensitive info first:
+         • Replace account numbers with XXXX
+         • Replace names with NAME
+         • Replace amounts with XX.XXX,XX
+         • Replace OTPs with 000000"
+
+User: [pastes redacted samples, one per message]
+
+Hermes: uses NVIDIA model to infer fields: amount format,
+        merchant position, date format, fields to strip
+
+Hermes → Telegram: "I detected:
+         • Amount: Colombian format ($XX.XXX,XX)
+         • Merchant: extracted from 'Compraste X en MERCHANT'
+         • Strips: account suffix, phone numbers
+         Looks right?"
+
+User: "yes" / corrections
+
+Hermes: stores pattern in SQLite (layer ②)
+        optionally generates fixture .txt + .expected.json files
+        and saves them locally so the user can PR them to the
+        community repo (tests/fixtures/) if they want
+```
+
+**Contributing a learned pattern back:**
+
+If the user confirms a pattern is working correctly after a week of real transactions,
+Hermes can generate the fixture files and prompt:
+
+```
+Hermes → Telegram: "Davivienda patterns have been working for 7 days with
+                    no corrections. Want me to generate fixtures for the
+                    community repo so others benefit too?"
+User: "yes"
+Hermes: writes tests/fixtures/emails/davivienda/ and sms/davivienda/
+        with synthetic samples matching the learned pattern
+```
+
+User opens a PR — the pattern enters the community layer.
+
+**Security exception — raw message access:**
+
+In reactive mode only, Hermes briefly accesses the raw pre-sanitization message to
+infer the pattern. This is the single documented exception to the privacy boundary rule.
+Constraints that must be enforced:
+
+- The raw content is passed to the NVIDIA model for structural inference only
+- It is never stored, never logged, never written to SQLite
+- The model call uses a system prompt that instructs it not to include values in its output — only structure (field positions, delimiters, formats)
+- Once the pattern is stored, all subsequent messages from that bank are sanitized before Hermes sees them
+- If the user declines to confirm the inferred transaction, the raw content is discarded and the transaction is dropped
 
 ### Setup Skill (`skills/setup/`)
 

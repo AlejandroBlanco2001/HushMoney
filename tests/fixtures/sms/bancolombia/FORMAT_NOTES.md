@@ -14,31 +14,14 @@ The `channel` field in the clean payload reflects the **origin** (`"sms"`), not 
 delivery transport (Telegram bot). The Telegram adapter should detect the Bancolombia
 SMS pattern and set `channel: "sms"` in the payload it hands to the sanitizer.
 
-## "Llave" Is Freeform — Not a Fixed Format
+## "Llave" — See BREB.md
 
-The Bancolombia "llave" (transfer key) is user-defined and can be any of:
+The llave is a Bre-B system alias, not a Bancolombia-specific field. It can be a cédula,
+a phone number, an email, or an alphanumeric code. Stripping it is a global sanitizer
+rule that applies to all banks.
 
-| Form | Example | Synthetic placeholder |
-|---|---|---|
-| Colombian cédula (10 digits) | `1001820876` | `0000000000` |
-| Phone number (10 digits, may start with 3) | `3001234567` | `3000000000` |
-| Username / handle | `@ISAB1010` | `@SYNTHETICUSER` |
-| Short numeric code (6 digits) | `882910` | `000000` |
-
-Because the format is freeform, the sanitizer **cannot use a length or character-class
-pattern**. It must match everything between `la llave ` and the next known sentence
-boundary (a space followed by `el`, `el`, or end of that clause):
-
-```
-la llave (\S+)(?=\s+el\s|\s+el\s)
-```
-
-Or more defensively: strip from `la llave ` to the next date marker (`el DD/MM`).
-
-In synthetic fixtures, vary the llave form across scenarios to exercise all paths:
-- `transferencia_recibida` → use `@SYNTHETICUSER` (username form)
-- Future `transferencia_recibida_cedula` → use `0000000000`
-- Future `transferencia_recibida_phone` → use `3000000000`
+See `tests/fixtures/BREB.md` for the full definition, the four key types, the recommended
+regex pattern, and synthetic placeholders to use across fixtures.
 
 ## One Raw Message, No Headers
 

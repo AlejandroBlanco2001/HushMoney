@@ -33,6 +33,7 @@ hushmoney/
 │       └── confirm.py         ← /confirm endpoint: relays Gmail setup code back to Hermes
 ├── skills/                    ← custom Hermes skills loaded by the agent at runtime
 │   ├── setup/                 ← one-time guided setup via Telegram (runs once)
+│   ├── bank_learning/         ← learns new bank formats from user samples; sanitizer fallback
 │   ├── expense_tracker/
 │   ├── categorizer/
 │   ├── debt_tracker/

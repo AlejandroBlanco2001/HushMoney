@@ -49,7 +49,7 @@ building the clean payload.
 | Account number (source) | `tu cuenta *1234` | Strip the whole phrase |
 | Account number (destination) | `la cuenta *00001111222` | Longer mask; still strip |
 | Product number | `tu producto 1234` | Used in Botón Bancolombia payments |
-| "Llave" key | `la llave 000000` / `la llave 0000000000` / `la llave @SYNTHETICUSER` | Freeform — can be cédula, phone number, or @username. Strip from `la llave ` to next date marker. See `sms/bancolombia/FORMAT_NOTES.md`. |
+| "Llave" key | `la llave 000000` / `la llave @SYNTHETICUSER` etc. | Bre-B universal alias — freeform, cross-bank. Strip from `la llave ` to next date marker. See `tests/fixtures/BREB.md`. |
 | Recipient/sender name | `MARIA GARCIA,` | Appears at message start for transfers; strip |
 | Transfer counterparty | `de JUAN PEREZ` | Sender name in incoming transfers; strip |
 | Phone numbers | `6045109095`, `018000931987`, `018000912345` | Support lines; strip |

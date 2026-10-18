@@ -10,6 +10,11 @@ The forwarder sanitizer is the **only** place in the system where raw financial 
 - Raw data must not bypass the sanitizer and reach Hermes
 - Clean payloads must not be enriched with raw data after the fact
 
+**There is exactly one documented exception:** the `bank_learning` skill in reactive mode
+briefly accesses a raw message to infer its structure when the sanitizer has no matching
+pattern. The constraints for this exception are strict — see the security exception rules
+at the bottom of this file.
+
 ## What Must Be Stripped by the Sanitizer
 
 The sanitizer must remove or redact all of the following before emitting a clean payload:
@@ -23,6 +28,14 @@ The sanitizer must remove or redact all of the following before emitting a clean
 | IBAN / routing numbers | Any string matching IBAN or ABA routing format |
 | URLs in bank messages | Often tracking links; strip entirely |
 | Raw balance figures | Current balance is not a transaction event |
+| **Bre-B llaves** | `la llave 1001820876`, `la llave @usuario`, `la llave 3001234567`, `la llave user@email.com` |
+
+**Bre-B llaves** deserve special attention. Bre-B is Colombia's national instant payment
+network — every major Colombian bank uses it. A "llave" is a user's universal payment
+alias and can be a national ID (cédula), a phone number, an email, or an alphanumeric
+handle. All four forms are equally sensitive and must be stripped. The pattern is
+positional: strip from `la llave ` to the next date token (`el DD/MM`), without trying
+to classify the type. See `tests/fixtures/BREB.md` for the full reference.
 
 The clean payload may only contain: `amount`, `currency`, `merchant` (normalized), `date`, `transaction_type`, `account_type`, `channel`.
 
@@ -60,12 +73,32 @@ The clean payload may only contain: `amount`, `currency`, `merchant` (normalized
   - No access to the host filesystem outside the sandbox
 - Any change to `config/openshell/policy.yaml` requires explicit team review — it is a security control, not a config file
 
+## bank_learning Exception Rules
+
+The `bank_learning` skill is the **only** component allowed to access raw pre-sanitization
+content, and only under these conditions:
+
+- **Reactive mode only** — raw access is never permitted in proactive mode (user provides
+  already-redacted samples)
+- The raw message is passed to the NVIDIA model with a system prompt that instructs it to
+  return **only structural information** (field positions, delimiters, date formats) —
+  never to echo, summarize, or reproduce values from the message
+- The raw message is held in memory only for the duration of the model call — it is never
+  written to SQLite, never logged, never sent over the network except to the inference endpoint
+- The inferred transaction values (amount, merchant, date) are shown to the user for
+  confirmation before being stored — if the user does not confirm, the transaction is dropped
+  and the raw content is discarded
+- If you are modifying `skills/bank_learning/`, this checklist applies in addition to the
+  standard one below
+
 ## Code Review Checklist for Security-Sensitive PRs
 
-Before merging any change to `forwarder/` or `config/`:
+Before merging any change to `forwarder/`, `config/`, or `skills/bank_learning/`:
 
 - [ ] No raw payload fields appear in any log statement
 - [ ] No secret values are hardcoded or committed
 - [ ] The sanitizer strips all data types listed above
 - [ ] The clean payload schema is validated before dispatch
 - [ ] OpenShell policy is unchanged (or change is explicitly justified)
+- [ ] If touching `bank_learning`: raw message is not stored or logged; model prompt
+      instructs structural-only output; user confirmation is required before any write
