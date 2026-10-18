@@ -1,0 +1,9 @@
+{
+  "amount": 85000.00,
+  "currency": "COP",
+  "merchant": "PEXTO CAPITAL SAS",
+  "date": "2026-09-14T08:43:19Z",
+  "transaction_type": "payment",
+  "account_type": "checking",
+  "channel": "email"
+}

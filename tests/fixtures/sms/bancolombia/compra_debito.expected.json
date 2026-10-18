@@ -1,0 +1,9 @@
+{
+  "amount": 32500.00,
+  "currency": "COP",
+  "merchant": "UBER RIDES",
+  "date": "2026-09-16T01:35:00Z",
+  "transaction_type": "debit",
+  "account_type": "checking",
+  "channel": "sms"
+}

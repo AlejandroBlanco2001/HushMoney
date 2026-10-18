@@ -157,7 +157,7 @@ If the sanitizer cannot determine a field from the raw message, omit it from the
 
 | Bank | Email fixtures | SMS fixtures | Notes |
 |---|---|---|---|
-| Bancolombia | pending | pending | Largest bank in Colombia; highest priority |
+| Bancolombia | 4 scenarios | 4 scenarios | `compra_debito`, `transferencia_recibida`, `pago_boton`, `transferencia_enviada`. See each channel's `FORMAT_NOTES.md`. |
 | Nequi | pending | pending | Digital wallet owned by Bancolombia; app notifications forwarded via Telegram |
 | Davivienda | pending | pending | |
 | BBVA Colombia | pending | pending | Uses international BBVA format with Spanish copy |
