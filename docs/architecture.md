@@ -90,6 +90,7 @@ Two channels in, one channel out. Stateless.
 | `channels/telegram.py` | Receive Telegram bot updates via Bot API |
 | `sanitizer/` | Strip OTPs, account numbers, card numbers, PII from raw message |
 | `dispatcher/` | POST clean payload to Hermes gateway |
+| `confirm.py` | `/confirm` endpoint — receives Gmail confirmation code intercepted by Cloudflare and relays it to Hermes during automated setup |
 
 The forwarder holds no state, no database, no retry queue. If dispatch fails, the message is dropped — financial notifications are ephemeral by nature.
 
@@ -120,31 +121,69 @@ All skills run inside the NVIDIA OpenShell sandbox. Policy at `config/openshell/
 
 ### Setup Skill (`skills/setup/`)
 
-Hermes guides the user through one-time configuration via their Telegram bot:
+Hermes orchestrates the entire setup without the user having to click anything in a browser. It uses the **Playwright MCP server** to drive the user's already-logged-in Chrome, with **Human-in-the-Loop (HITL) checkpoints** via Telegram before any significant action.
+
+The Cloudflare Email Worker intercepts Gmail's confirmation email during setup and relays the code to the forwarder's `/confirm` endpoint, which passes it back to Hermes — so even the email confirmation step is handled automatically.
 
 ```
-User: hermes setup
+User → Telegram: "hermes setup"
 
-Hermes: "Let's get HushMoney running. First, create a Telegram bot:
-         1. Open @BotFather on Telegram
-         2. Send /newbot and follow the prompts
-         3. Paste the token here."
+── Phase 1: Telegram bot ───────────────────────────────────────────
+Hermes → Telegram: "Open @BotFather, send /newbot, paste the token here."
+User → Telegram: [pastes token]
+Hermes: stores token, validates it works
 
-User: [pastes token]
+── Phase 2: Gmail forwarding (automated via Playwright MCP) ────────
+Hermes → Playwright MCP: open Chrome (user's existing profile, already logged in)
+Hermes → Playwright MCP: navigate to Gmail Settings → Forwarding
+Hermes → Telegram (HITL checkpoint):
+  "I'm about to add a forwarding address to your Gmail.
+   [screenshot attached]
+   Confirm to proceed, or cancel."
+User → Telegram: "confirm"
+Hermes → Playwright MCP: add hushmoney address, submit
 
-Hermes: "Got it. Now your email forwarding address is:
-         hushmoney-abc123@your-deploy.dev
-         Add a forwarding rule in Gmail:
-         Settings → Forwarding → Add forwarding address
-         Forward mail from: [your bank's sender address]
-         I'll wait for a test email..."
+  [Gmail sends a confirmation email to the HushMoney address]
+  [Cloudflare Email Worker intercepts it, POSTs to forwarder /confirm]
+  [Forwarder extracts the 9-digit code, calls Hermes]
 
-[user configures forwarding, bank sends a test notification]
+Hermes → Playwright MCP: enter confirmation code, click verify
+Hermes → Telegram (HITL checkpoint):
+  "Forwarding confirmed. Now add a filter so only your bank's
+   emails forward (not everything). Which bank?"
+User → Telegram: "Santander"
+Hermes → Playwright MCP: create Gmail filter for sender address, save
+Hermes → Telegram: "Filter set. Send a test transaction and I'll confirm receipt."
 
-Hermes: "Received! Setup complete. I'll start tracking from here."
+── Phase 3: SMS redirect (Android) ─────────────────────────────────
+Hermes → Telegram: "For SMS alerts: do you use Android or iOS?"
+User → Telegram: "Android"
+Hermes → Playwright MCP: open Tasker profile download page (or generate profile XML)
+Hermes → Telegram:
+  "Download this Tasker profile and import it. It will auto-forward
+   bank SMS to this bot. [file attached / link]
+   Reply 'done' once imported."
+User → Telegram: "done"
+Hermes → Telegram: "Send yourself a test SMS or wait for the next bank alert."
+
+── Phase 4: Verification ────────────────────────────────────────────
+Hermes waits up to 10 minutes for a test payload to arrive via either channel.
+Hermes → Telegram: "All set. HushMoney is running."
 ```
 
-After setup completes, the `setup` skill marks itself done and will not re-run unless explicitly reset.
+**HITL checkpoints** — Hermes asks for confirmation before:
+- Adding the Gmail forwarding address
+- Creating the Gmail filter
+- Any step that writes to external services
+
+After setup completes, the `setup` skill marks itself done and will not re-run unless explicitly reset with `hermes setup --reset`.
+
+**SMS redirect — Android vs. iOS:**
+
+| Platform | Approach |
+|---|---|
+| Android | Hermes generates a Tasker profile XML pre-configured with the bot token and bank sender numbers. User imports it — one tap. Auto-forwards matching SMS to the Telegram bot with no further action. |
+| iOS | Apple's sandbox prevents background SMS interception. Best path: switch bank notification channel from SMS to email in the banking app settings. Hermes guides this via Playwright (bank's web portal) using the same HITL pattern. Alternatively, iOS Shortcuts can be triggered by banking app push notifications and POST to the forwarder webhook — Hermes provides the Shortcut as a downloadable `.shortcut` file. |
 
 ### Config (`config/`)
 

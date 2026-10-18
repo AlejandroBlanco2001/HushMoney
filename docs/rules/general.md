@@ -39,10 +39,25 @@ Apply these rules to every file in the repository, regardless of language or com
 
 ## Testing
 
+Not every change needs a test. Write tests for code that is a hard dependency for the system to work correctly — not for every function you touch.
+
+**Write tests when:**
+- The code is a trust boundary (the sanitizer, the dispatcher schema, the DB write layer)
+- A silent regression would be hard to detect (pattern matching, payload transformation)
+- The logic has meaningful branching that each path matters (e.g. cash vs. digital detection)
+
+**Skip tests when:**
+- It's a small adjustment (a prompt tweak, a label rename, a config value)
+- The behavior is already covered by a broader test above it
+- Writing the test would be longer and more brittle than the code itself
+
+**Rules that always apply when you do write tests:**
 - Tests verify behavior, not implementation — test what a function does, not how
 - No mocking of the SQLite database in integration tests; use a real in-memory SQLite instance
 - Test file names mirror source file names: `skills/categorizer/rules.py` → `skills/categorizer/test_rules.py`
 - A test that always passes is worse than no test
+
+For LLM-dependent skill logic (categorization accuracy, summary quality), use evals — not unit tests. See `docs/rules/evals.md`.
 
 ## Naming
 

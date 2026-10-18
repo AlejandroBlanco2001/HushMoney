@@ -21,6 +21,7 @@ hushmoney/
 │       ├── general.md         ← language-agnostic conventions (read for every task)
 │       ├── python.md          ← Python 3.12 specifics (read when touching forwarder/)
 │       ├── security.md        ← PII/OTP rules (read when touching forwarder/ or config/)
+│       ├── evals.md           ← eval strategy for Hermes skills (read when touching skills/)
 │       └── git.md             ← branch and commit conventions
 ├── forwarder/                 ← Python 3.12 — receives, sanitizes, dispatches messages
 │   └── src/
@@ -28,7 +29,8 @@ hushmoney/
 │       │   ├── email.py       ← HTTP POST from Cloudflare Email Worker
 │       │   └── telegram.py    ← Telegram Bot API (user's own bot)
 │       ├── sanitizer/         ← strip OTP, account numbers, PII
-│       └── dispatcher/        ← POST clean payload to Hermes
+│       ├── dispatcher/        ← POST clean payload to Hermes
+│       └── confirm.py         ← /confirm endpoint: relays Gmail setup code back to Hermes
 ├── skills/                    ← custom Hermes skills loaded by the agent at runtime
 │   ├── setup/                 ← one-time guided setup via Telegram (runs once)
 │   ├── expense_tracker/
@@ -48,7 +50,7 @@ hushmoney/
 |---|---|
 | Any file in the repo | `docs/rules/general.md` + `docs/rules/git.md` |
 | `forwarder/` | + `docs/rules/python.md` + `docs/rules/security.md` |
-| `skills/` | + `docs/rules/python.md` |
+| `skills/` | + `docs/rules/python.md` + `docs/rules/evals.md` |
 | `config/` | + `docs/rules/security.md` |
 
 ## Tech Stack at a Glance

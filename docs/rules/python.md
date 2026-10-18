@@ -61,3 +61,17 @@ component/
 - Type checker: `pyright` in strict mode
 - Tests: `pytest`; run via `scripts/run_tests.sh` from repo root — never bare `pytest`
 - All four must pass before a PR is opened
+
+## What to Test in the Forwarder
+
+The forwarder has one job that must never silently fail: stripping sensitive data before dispatch. Focus test coverage on that boundary.
+
+| Module | Test? | Why |
+|---|---|---|
+| `sanitizer/` | **Yes — always** | Privacy boundary; a miss leaks PII to Hermes |
+| `dispatcher/` | **Yes** | Schema mismatch silently corrupts Hermes input |
+| `channels/email.py` | Light integration test with a recorded payload | Adapter logic, not complex |
+| `channels/telegram.py` | Light integration test with a recorded update | Same |
+| `/confirm` endpoint | **Yes** | Used during setup to relay Gmail confirmation code; must be reliable |
+
+Use `hypothesis` for sanitizer fuzz testing — generate arbitrary strings and assert no sensitive patterns survive. A regex that passes all hand-written examples but fails on a real bank message format is a real risk.
