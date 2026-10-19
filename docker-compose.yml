@@ -1,0 +1,55 @@
+#
+# docker-compose.yml — HushMoney local development
+#
+# Mirrors the production Fly.io layout so local and prod behave identically.
+#
+# Usage:
+#   cp .env.example .env && $EDITOR .env  # fill in secrets
+#   HERMES_UID=$(id -u) HERMES_GID=$(id -g) docker compose up -d
+#
+# Notes:
+#   - hermes-data volume persists SQLite and learned patterns across restarts.
+#   - Skills and config are bind-mounted read-only so edits take effect on restart.
+#   - The forwarder service is a placeholder; uncomment once forwarder/ is implemented.
+#
+
+services:
+  hermes:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hushmoney-hermes
+    container_name: hermes
+    restart: unless-stopped
+    volumes:
+      - hermes-data:/opt/data
+      - ./skills:/opt/data/skills:ro
+      - ./config/hermes.yaml:/opt/data/hermes.yaml:ro
+    environment:
+      - HERMES_UID=${HERMES_UID:-1000}
+      - HERMES_GID=${HERMES_GID:-1000}
+      - NEBIUS_API_KEY=${NEBIUS_API_KEY}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+    command: ["gateway", "run"]
+    ports:
+      - "8080:8080"
+
+  # Uncomment once forwarder/ is implemented.
+  # forwarder:
+  #   build:
+  #     context: ./forwarder
+  #   restart: unless-stopped
+  #   ports:
+  #     - "9000:9000"
+  #   environment:
+  #     - EMAIL_WEBHOOK_SECRET=${EMAIL_WEBHOOK_SECRET}
+  #     - HERMES_GATEWAY_URL=http://hermes:8080/gateway
+  #     - HERMES_GATEWAY_SECRET=${HERMES_GATEWAY_SECRET}
+  #     - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+  #     - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+  #   depends_on:
+  #     - hermes
+
+volumes:
+  hermes-data:

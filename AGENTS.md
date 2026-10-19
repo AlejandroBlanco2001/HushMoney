@@ -17,6 +17,7 @@ hushmoney/
 ├── docs/
 │   ├── architecture.md        ← data flow, component map, integration points
 │   ├── onboarding.md          ← guide for non-developers using Cursor/OpenCode
+│   ├── deployment.md          ← EC2 + Docker setup for the team
 │   └── rules/
 │       ├── general.md         ← language-agnostic conventions (read for every task)
 │       ├── python.md          ← Python 3.12 specifics (read when touching forwarder/)
