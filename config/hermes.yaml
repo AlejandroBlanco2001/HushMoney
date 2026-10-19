@@ -4,8 +4,9 @@
 
 agent:
   name: hushmoney
-  # NVIDIA open model via Nebius — update with specific model ID when confirmed
-  model: nvidia/open-model-placeholder
+  # NVIDIA Nemotron 3 Nano (30B total / 3B active MoE) via Nebius Serverless
+  # See evals/model_selection/ for the full experiment that drove this decision.
+  model: nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B
   skills_path: ../skills
 
 database:
