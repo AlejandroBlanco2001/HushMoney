@@ -2,6 +2,9 @@
   "name": "hushmoney-email-worker",
   "private": true,
   "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
   "dependencies": {
     "postal-mime": "^4.0.11"
   }
