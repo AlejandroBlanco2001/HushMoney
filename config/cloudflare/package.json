@@ -3,9 +3,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "lint": "oxlint . && biome lint .",
+    "format": "biome format --write .",
+    "check": "biome check --write ."
   },
   "dependencies": {
     "postal-mime": "^4.0.11"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "oxlint": "^0.16.0"
   }
 }

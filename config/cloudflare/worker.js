@@ -1,6 +1,6 @@
-import PostalMime from "postal-mime";
+import PostalMime from 'postal-mime';
 
-const PLACEHOLDER_WEBHOOK_URL = "https://REPLACE_ME/channels/email";
+const PLACEHOLDER_WEBHOOK_URL = 'https://REPLACE_ME/channels/email';
 
 function isWebhookConfigured(env) {
   const url = env.EMAIL_WEBHOOK_URL;
@@ -9,27 +9,27 @@ function isWebhookConfigured(env) {
 }
 
 function senderAddress(parsed, message) {
-  return parsed.from?.address || message.from || "";
+  return parsed.from?.address || message.from || '';
 }
 
 async function parseInboundEmail(message) {
   const parsed = await PostalMime.parse(message.raw);
-  const body = (parsed.text || "").trim();
+  const body = (parsed.text || '').trim();
   if (!body) {
     return null;
   }
   return {
     from: senderAddress(parsed, message),
-    subject: parsed.subject || message.headers.get("subject") || "",
+    subject: parsed.subject || message.headers.get('subject') || '',
     body,
   };
 }
 
 async function postToForwarder(env, payload) {
   return fetch(env.EMAIL_WEBHOOK_URL, {
-    method: "POST",
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
       Authorization: `Bearer ${env.EMAIL_WEBHOOK_SECRET}`,
     },
     body: JSON.stringify(payload),
@@ -39,7 +39,7 @@ async function postToForwarder(env, payload) {
 export default {
   async email(message, env, _ctx) {
     if (!isWebhookConfigured(env)) {
-      console.error("Email webhook not configured");
+      console.error('Email webhook not configured');
       return;
     }
 
@@ -47,12 +47,12 @@ export default {
     try {
       payload = await parseInboundEmail(message);
     } catch {
-      console.error("Email parse failed");
+      console.error('Email parse failed');
       return;
     }
 
     if (payload === null) {
-      console.error("Email body empty after parse");
+      console.error('Email body empty after parse');
       return;
     }
 
@@ -60,15 +60,14 @@ export default {
     try {
       response = await postToForwarder(env, payload);
     } catch {
-      console.error("Forwarder dispatch failed");
+      console.error('Forwarder dispatch failed');
       return;
     }
-    
+
     if (!response.ok) {
       console.error(`Forwarder rejected email status=${response.status}`);
       return;
     }
-    console.log("Dispatched to forwarder");
-
+    console.log('Dispatched to forwarder');
   },
 };
