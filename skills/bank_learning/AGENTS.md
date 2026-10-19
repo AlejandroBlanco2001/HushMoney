@@ -53,6 +53,20 @@ After 7 days and N successful uses with no corrections, prompt the user:
 If yes: generate `{scenario}.txt` + `{scenario}.expected.json` using synthetic values
 (follow `tests/fixtures/SYNTHETIC_DATA.md` rules), write to the repo, notify user.
 
+## Locale context
+
+Before calling the model for structural inference, read the user's locale from SQLite
+(stored by the `setup` skill). Inject it into the system prompt to remove date format
+ambiguity — a US user seeing `09/15/2026` uses MM/DD/YYYY; everyone else uses DD/MM/YYYY.
+
+```sql
+SELECT value FROM user_settings WHERE key = 'locale';  -- ISO country code, e.g. "CO", "IN", "US"
+```
+
+If locale is not set (user skipped setup or added a bank before completing it), omit
+the locale hint and let the user confirm the inferred date format explicitly during
+the confirmation step.
+
 ## What NOT to do
 
 - Do not store raw message content anywhere — not in SQLite, not in logs
