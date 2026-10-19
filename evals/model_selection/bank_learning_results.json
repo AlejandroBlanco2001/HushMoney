@@ -1,0 +1,252 @@
+[
+  {
+    "scenario": "hdfc_india_card_spend",
+    "source": "github.com/akhilnarang/bank-sms-parser",
+    "models": {
+      "nano": {
+        "score": 0.8888888888888888,
+        "correct": 8,
+        "total": 9,
+        "misses": [
+          "date_format: got 'DD-MM-YYYY', want 'DD-MM-YYYY HH:MM:SS'"
+        ],
+        "latency_ms": 4291,
+        "input_tokens": 518,
+        "output_tokens": 1085,
+        "parsed": {
+          "bank_name": "HDFC Bank",
+          "amount": {
+            "currency_symbol": "Rs.",
+            "symbol_position": "prefix",
+            "thousands_separator": ",",
+            "decimal_separator": "."
+          },
+          "date_format": "DD-MM-YYYY",
+          "transaction_keyword": "Spent",
+          "transaction_type": "debit",
+          "account_indicator": "last 4 digits after x",
+          "pii_fields": [
+            "card_number",
+            "balance"
+          ]
+        },
+        "error": null
+      },
+      "super": {
+        "score": 0.8888888888888888,
+        "correct": 8,
+        "total": 9,
+        "misses": [
+          "date_format: got 'DD-MM-YYYY', want 'DD-MM-YYYY HH:MM:SS'"
+        ],
+        "latency_ms": 4458,
+        "input_tokens": 518,
+        "output_tokens": 752,
+        "parsed": {
+          "bank_name": "HDFC Bank",
+          "amount": {
+            "currency_symbol": "Rs.",
+            "symbol_position": "prefix",
+            "thousands_separator": ",",
+            "decimal_separator": "."
+          },
+          "date_format": "DD-MM-YYYY",
+          "transaction_keyword": "Spent",
+          "transaction_type": "debit",
+          "account_indicator": "last 4 digits after x",
+          "pii_fields": [
+            "card_number",
+            "balance"
+          ]
+        },
+        "error": null
+      }
+    }
+  },
+  {
+    "scenario": "hdfc_india_upi_debit",
+    "source": "github.com/sarim2000/pennywiseai-tracker/pull/863",
+    "models": {
+      "nano": {
+        "score": 1.0,
+        "correct": 8,
+        "total": 8,
+        "misses": [],
+        "latency_ms": 5723,
+        "input_tokens": 524,
+        "output_tokens": 1554,
+        "parsed": {
+          "bank_name": "HDFC Bank",
+          "amount": {
+            "currency_symbol": "Rs.",
+            "symbol_position": "prefix",
+            "thousands_separator": ",",
+            "decimal_separator": "."
+          },
+          "date_format": "DD-MM-YY",
+          "transaction_keyword": "debited",
+          "transaction_type": "debit",
+          "account_indicator": "XX + last 4 digits",
+          "pii_fields": [
+            "account_number",
+            "upi_id",
+            "reference_number",
+            "balance"
+          ]
+        },
+        "error": null
+      },
+      "super": {
+        "score": 1.0,
+        "correct": 8,
+        "total": 8,
+        "misses": [],
+        "latency_ms": 7381,
+        "input_tokens": 524,
+        "output_tokens": 1257,
+        "parsed": {
+          "bank_name": "HDFC Bank",
+          "amount": {
+            "currency_symbol": "Rs.",
+            "symbol_position": "prefix",
+            "thousands_separator": ",",
+            "decimal_separator": "."
+          },
+          "date_format": "DD-MM-YY",
+          "transaction_keyword": "debited",
+          "transaction_type": "debit",
+          "account_indicator": "last 4 digits after x",
+          "pii_fields": [
+            "account_number",
+            "balance",
+            "upi_id",
+            "reference_number"
+          ]
+        },
+        "error": null
+      }
+    }
+  },
+  {
+    "scenario": "generic_us_debit",
+    "source": "smscountry.com/blog/sms-templates-for-financial-services/",
+    "models": {
+      "nano": {
+        "score": 1.0,
+        "correct": 9,
+        "total": 9,
+        "misses": [],
+        "latency_ms": 4729,
+        "input_tokens": 533,
+        "output_tokens": 1417,
+        "parsed": {
+          "bank_name": "First National Bank",
+          "amount": {
+            "currency_symbol": "USD",
+            "symbol_position": "prefix",
+            "thousands_separator": ",",
+            "decimal_separator": "."
+          },
+          "date_format": "MM/DD/YYYY",
+          "transaction_keyword": "debited",
+          "transaction_type": "debit",
+          "account_indicator": "ending 4 digits",
+          "pii_fields": [
+            "account_number",
+            "balance",
+            "phone_number"
+          ]
+        },
+        "error": null
+      },
+      "super": {
+        "score": 1.0,
+        "correct": 9,
+        "total": 9,
+        "misses": [],
+        "latency_ms": 4325,
+        "input_tokens": 533,
+        "output_tokens": 817,
+        "parsed": {
+          "bank_name": "First National Bank",
+          "amount": {
+            "currency_symbol": "USD",
+            "symbol_position": "prefix",
+            "thousands_separator": ",",
+            "decimal_separator": "."
+          },
+          "date_format": "MM/DD/YYYY",
+          "transaction_keyword": "debited",
+          "transaction_type": "debit",
+          "account_indicator": "last 4 digits",
+          "pii_fields": [
+            "account_number",
+            "phone_number",
+            "balance"
+          ]
+        },
+        "error": null
+      }
+    }
+  },
+  {
+    "scenario": "bancolombia_co_compra_debito",
+    "source": "tests/fixtures/sms/bancolombia/compra_debito.txt",
+    "models": {
+      "nano": {
+        "score": 1.0,
+        "correct": 9,
+        "total": 9,
+        "misses": [],
+        "latency_ms": 4069,
+        "input_tokens": 534,
+        "output_tokens": 1117,
+        "parsed": {
+          "bank_name": "Bancolombia",
+          "amount": {
+            "currency_symbol": "$",
+            "symbol_position": "prefix",
+            "thousands_separator": ".",
+            "decimal_separator": ","
+          },
+          "date_format": "DD/MM/YYYY",
+          "transaction_keyword": "Compraste",
+          "transaction_type": "debit",
+          "account_indicator": "asterisk + 4 digits",
+          "pii_fields": [
+            "card_number",
+            "phone_number"
+          ]
+        },
+        "error": null
+      },
+      "super": {
+        "score": 1.0,
+        "correct": 9,
+        "total": 9,
+        "misses": [],
+        "latency_ms": 6008,
+        "input_tokens": 534,
+        "output_tokens": 971,
+        "parsed": {
+          "bank_name": "Bancolombia",
+          "amount": {
+            "currency_symbol": "$",
+            "symbol_position": "prefix",
+            "thousands_separator": ".",
+            "decimal_separator": ","
+          },
+          "date_format": "DD/MM/YYYY",
+          "transaction_keyword": "Compraste",
+          "transaction_type": "debit",
+          "account_indicator": "last 4 digits after *",
+          "pii_fields": [
+            "card_number",
+            "phone_number"
+          ]
+        },
+        "error": null
+      }
+    }
+  }
+]

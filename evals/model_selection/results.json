@@ -1,0 +1,310 @@
+[
+  {
+    "fixture": "emails/bancolombia/compra_debito",
+    "input": {
+      "amount": 47350.0,
+      "currency": "COP",
+      "merchant": "RAPPI",
+      "date": "2026-09-15T17:43:00Z",
+      "transaction_type": "debit",
+      "account_type": "checking",
+      "channel": "email"
+    },
+    "correct_category": "needs_clarification",
+    "models": {
+      "nano": {
+        "category": "needs_clarification",
+        "reason": "payment_gateway",
+        "latency_ms": 1637,
+        "input_tokens": 347,
+        "output_tokens": 160,
+        "error": null
+      },
+      "super": {
+        "category": "food_delivery",
+        "reason": "",
+        "latency_ms": 1740,
+        "input_tokens": 347,
+        "output_tokens": 80,
+        "error": null
+      },
+      "ultra": {
+        "category": "transport",
+        "reason": "",
+        "latency_ms": 2524,
+        "input_tokens": 347,
+        "output_tokens": 151,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "emails/bancolombia/pago_boton",
+    "input": {
+      "amount": 85000.0,
+      "currency": "COP",
+      "merchant": "PEXTO CAPITAL SAS",
+      "date": "2026-09-14T08:43:19Z",
+      "transaction_type": "payment",
+      "account_type": "checking",
+      "channel": "email"
+    },
+    "correct_category": "needs_clarification",
+    "models": {
+      "nano": {
+        "category": "needs_clarification",
+        "reason": "payment_gateway",
+        "latency_ms": 1979,
+        "input_tokens": 351,
+        "output_tokens": 101,
+        "error": null
+      },
+      "super": {
+        "category": "other",
+        "reason": "",
+        "latency_ms": 2179,
+        "input_tokens": 351,
+        "output_tokens": 172,
+        "error": null
+      },
+      "ultra": {
+        "category": "needs_clarification",
+        "reason": "payment_gateway",
+        "latency_ms": 3651,
+        "input_tokens": 351,
+        "output_tokens": 110,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "emails/bancolombia/transferencia_enviada",
+    "input": {
+      "amount": 120000.0,
+      "currency": "COP",
+      "date": "2026-09-14T04:54:00Z",
+      "transaction_type": "transfer_out",
+      "account_type": "checking",
+      "channel": "email"
+    },
+    "correct_category": "transfer",
+    "models": {
+      "nano": {
+        "category": "transfer",
+        "reason": "",
+        "latency_ms": 1309,
+        "input_tokens": 341,
+        "output_tokens": 41,
+        "error": null
+      },
+      "super": {
+        "category": "transfer",
+        "reason": "",
+        "latency_ms": 995,
+        "input_tokens": 341,
+        "output_tokens": 58,
+        "error": null
+      },
+      "ultra": {
+        "category": "transfer",
+        "reason": "",
+        "latency_ms": 1174,
+        "input_tokens": 341,
+        "output_tokens": 62,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "emails/bancolombia/transferencia_recibida",
+    "input": {
+      "amount": 250000.0,
+      "currency": "COP",
+      "date": "2026-09-14T13:06:00Z",
+      "transaction_type": "transfer_in",
+      "account_type": "checking",
+      "channel": "email"
+    },
+    "correct_category": "transfer",
+    "models": {
+      "nano": {
+        "category": "transfer",
+        "reason": "",
+        "latency_ms": 1051,
+        "input_tokens": 341,
+        "output_tokens": 42,
+        "error": null
+      },
+      "super": {
+        "category": "transfer",
+        "reason": "",
+        "latency_ms": 951,
+        "input_tokens": 341,
+        "output_tokens": 33,
+        "error": null
+      },
+      "ultra": {
+        "category": "transfer",
+        "reason": "",
+        "latency_ms": 1796,
+        "input_tokens": 341,
+        "output_tokens": 61,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "sms/bancolombia/compra_debito",
+    "input": {
+      "amount": 32500.0,
+      "currency": "COP",
+      "merchant": "UBER RIDES",
+      "date": "2026-09-16T01:35:00Z",
+      "transaction_type": "debit",
+      "account_type": "checking",
+      "channel": "sms"
+    },
+    "correct_category": "transport",
+    "models": {
+      "nano": {
+        "category": "transport",
+        "reason": "",
+        "latency_ms": 1082,
+        "input_tokens": 350,
+        "output_tokens": 44,
+        "error": null
+      },
+      "super": {
+        "category": "transport",
+        "reason": "",
+        "latency_ms": 934,
+        "input_tokens": 350,
+        "output_tokens": 38,
+        "error": null
+      },
+      "ultra": {
+        "category": "transport",
+        "reason": "",
+        "latency_ms": 1047,
+        "input_tokens": 350,
+        "output_tokens": 52,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "sms/bancolombia/pago_boton",
+    "input": {
+      "amount": 62000.0,
+      "currency": "COP",
+      "merchant": "PEXTO CAPITAL SAS",
+      "date": "2026-09-14T03:20:37Z",
+      "transaction_type": "payment",
+      "account_type": "checking",
+      "channel": "sms"
+    },
+    "correct_category": "needs_clarification",
+    "models": {
+      "nano": {
+        "category": "needs_clarification",
+        "reason": "payment_gateway",
+        "latency_ms": 1379,
+        "input_tokens": 352,
+        "output_tokens": 101,
+        "error": null
+      },
+      "super": {
+        "category": "services",
+        "reason": "",
+        "latency_ms": 2329,
+        "input_tokens": 352,
+        "output_tokens": 256,
+        "error": null
+      },
+      "ultra": {
+        "category": "needs_clarification",
+        "reason": "payment_gateway",
+        "latency_ms": 2193,
+        "input_tokens": 352,
+        "output_tokens": 110,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "sms/bancolombia/transferencia_enviada",
+    "input": {
+      "amount": 75000.0,
+      "currency": "COP",
+      "date": "2026-09-14T04:54:00Z",
+      "transaction_type": "transfer_out",
+      "account_type": "checking",
+      "channel": "sms"
+    },
+    "correct_category": "transfer",
+    "models": {
+      "nano": {
+        "category": "transfer",
+        "reason": "",
+        "latency_ms": 1019,
+        "input_tokens": 341,
+        "output_tokens": 34,
+        "error": null
+      },
+      "super": {
+        "category": "transfer",
+        "reason": "",
+        "latency_ms": 1407,
+        "input_tokens": 341,
+        "output_tokens": 36,
+        "error": null
+      },
+      "ultra": {
+        "category": "transfer",
+        "reason": "",
+        "latency_ms": 2097,
+        "input_tokens": 341,
+        "output_tokens": 59,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "sms/bancolombia/transferencia_recibida",
+    "input": {
+      "amount": 185000.0,
+      "currency": "COP",
+      "date": "2026-09-14T06:40:00Z",
+      "transaction_type": "transfer_in",
+      "account_type": "checking",
+      "channel": "sms"
+    },
+    "correct_category": "transfer",
+    "models": {
+      "nano": {
+        "category": "transfer",
+        "reason": "",
+        "latency_ms": 907,
+        "input_tokens": 342,
+        "output_tokens": 42,
+        "error": null
+      },
+      "super": {
+        "category": "transfer",
+        "reason": "",
+        "latency_ms": 975,
+        "input_tokens": 342,
+        "output_tokens": 57,
+        "error": null
+      },
+      "ultra": {
+        "category": "transfer",
+        "reason": "",
+        "latency_ms": 2627,
+        "input_tokens": 342,
+        "output_tokens": 60,
+        "error": null
+      }
+    }
+  }
+]
