@@ -34,3 +34,7 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Cloudflare / Node (Email Worker)
+node_modules/
+.wrangler/

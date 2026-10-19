@@ -1,0 +1,8 @@
+{
+  "name": "hushmoney-email-worker",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "postal-mime": "^4.0.11"
+  }
+}
