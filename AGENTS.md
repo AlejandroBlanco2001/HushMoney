@@ -4,7 +4,7 @@ This is the primary entry point for any AI coding assistant (Claude, Cursor, Ope
 
 ## What Is HushMoney?
 
-HushMoney is a zero-input expense tracker. It intercepts financial notifications (bank emails, SMS alerts, messaging apps), strips all sensitive information, and routes clean transaction signals to **Hermes Agent** — a self-improving AI agent that categorizes expenses, tracks debts, and delivers summaries.
+HushMoney is a zero-input expense tracker. It intercepts bank email notifications by polling Gmail via IMAP, routes the parsed message to **Hermes Agent** — an AI agent that categorizes expenses, tracks debts, and delivers summaries — and delivers results via Telegram.
 
 Users never manually enter a transaction. The system does it for them.
 
@@ -13,37 +13,62 @@ Users never manually enter a transaction. The system does it for them.
 ```
 hushmoney/
 ├── AGENTS.md                  ← you are here
-├── README.md
+├── config/
+│   ├── hermes.yaml            ← Hermes runtime config (no secrets)
+│   └── schema.sql             ← SQLite schema applied by Hermes on first run
+├── docker-compose.yml         ← local + EC2 orchestration
+├── docker-entrypoint.sh       ← starts hermes gateway run + uvicorn
+├── Dockerfile                 ← Hermes container image with gateway server
 ├── docs/
 │   ├── architecture.md        ← data flow, component map, integration points
-│   ├── onboarding.md          ← guide for non-developers using Cursor/OpenCode
 │   ├── deployment.md          ← EC2 + Docker setup for the team
+│   ├── onboarding.md          ← guide for non-developers using Cursor/OpenCode
 │   └── rules/
 │       ├── general.md         ← language-agnostic conventions (read for every task)
 │       ├── python.md          ← Python 3.12 specifics (read when touching forwarder/)
 │       ├── security.md        ← PII/OTP rules (read when touching forwarder/ or config/)
 │       ├── evals.md           ← eval strategy for Hermes skills (read when touching skills/)
 │       └── git.md             ← branch and commit conventions
-├── forwarder/                 ← Python 3.12 — receives, sanitizes, dispatches messages
-│   └── src/
-│       ├── channels/
-│       │   ├── email.py       ← HTTP POST from Cloudflare Email Worker
-│       │   └── telegram.py    ← Telegram Bot API (user's own bot)
-│       ├── sanitizer/         ← strip OTP, account numbers, PII
-│       ├── dispatcher/        ← POST clean payload to Hermes
-│       └── confirm.py         ← /confirm endpoint: relays Gmail setup code back to Hermes
+├── evals/
+│   └── model_selection/       ← model eval experiments (see evals.md)
+├── forwarder/                 ← Python 3.12 — polls Gmail, parses emails, dispatches to Hermes
+│   ├── src/forwarder/
+│   │   ├── channels/
+│   │   │   ├── telegram.py        ← Starlette webhook server for SMS relay via Telegram
+│   │   │   └── telegram_config.py ← config loader for Telegram channel
+│   │   ├── sanitizer/
+│   │   │   ├── banks.py           ← Bancolombia (and future banks) regex patterns
+│   │   │   ├── models.py          ← CleanPayload, Channel, TransactionType types
+│   │   │   ├── parser.py          ← applies bank pattern to extract structured fields
+│   │   │   ├── redaction.py       ← strips OTPs, account numbers, card numbers
+│   │   │   └── selector.py        ← matches raw text to a known bank
+│   │   ├── __main__.py            ← poll loop entry point
+│   │   ├── config.py              ← env var loading
+│   │   ├── hermes.py              ← HTTP POST CleanPayload to gateway_server
+│   │   └── imap.py                ← IMAP polling + RFC 822 parsing
+│   └── tests/
+│       ├── test_bank_selection.py
+│       ├── test_config.py
+│       ├── test_hermes.py
+│       ├── test_imap.py
+│       ├── test_main.py
+│       ├── test_redaction.py
+│       ├── test_sanitizer.py
+│       ├── test_telegram.py
+│       └── test_telegram_config.py
+├── gateway_server.py          ← Starlette HTTP server inside the Hermes container
+├── scripts/
+│   └── setup.sh               ← one-shot EC2 bootstrap + deploy
 ├── skills/                    ← custom Hermes skills loaded by the agent at runtime
 │   ├── setup/                 ← one-time guided setup via Telegram (runs once)
-│   ├── bank_learning/         ← learns new bank formats from user samples; sanitizer fallback
+│   ├── bank_learning/         ← learns new bank formats from user samples
 │   ├── expense_tracker/
 │   ├── categorizer/
 │   ├── debt_tracker/
 │   └── summaries/
-└── config/                    ← Hermes config, OpenShell policy, system prompts
-    ├── hermes.yaml
-    ├── cloudflare/            ← Email Worker script + wrangler config
-    ├── openshell/
-    └── prompts/
+└── tests/
+    └── fixtures/
+        └── emails/bancolombia/ ← real email samples (.eml) used in tests
 ```
 
 ## Rule Files — Read Before Touching an Area
@@ -60,27 +85,28 @@ hushmoney/
 | Component | Technology |
 |---|---|
 | Agent runtime | [Hermes Agent](https://github.com/NousResearch/hermes-agent) (NousResearch) |
-| Agent sandbox | NVIDIA OpenShell |
-| Models | NVIDIA open models via Nebius |
-| Infra | Nebius AI Cloud |
+| Agent sandbox | NVIDIA OpenShell (planned) |
+| Models | NVIDIA open models via Nebius Serverless |
+| Infra | AWS EC2 t2.micro (free tier) |
+| Email ingestion | Gmail IMAP polling (App Password) |
+| HTTP gateway | Starlette + uvicorn (`gateway_server.py`) |
 | Forwarder | Python 3.12 |
 | Database | SQLite (managed by Hermes) |
-| User notifications | Telegram (cash operations only) |
+| User notifications | Telegram |
 
 ## Core Invariants
 
 These must not be violated under any circumstances:
 
-1. **No raw financial data leaves the forwarder unsanitized.** The sanitizer is the trust boundary. Everything downstream of it handles clean, non-sensitive payloads only.
+1. **No raw financial data leaves the forwarder unsanitized.** The sanitizer is the trust boundary — everything downstream receives `CleanPayload` only.
 2. **No PII, OTPs, or account numbers are ever logged.** See `docs/rules/security.md`.
 3. **Skills live at the edge.** New capabilities go into `skills/`, not into Hermes core. This mirrors Hermes's own architecture principle: keep the core narrow.
 4. **Hermes config is the source of truth for behavior.** Do not use environment variables for non-secret configuration; put it in `config/hermes.yaml`.
-5. **The forwarder is stateless.** It receives, sanitizes, and dispatches. It does not store, retry-queue, or make decisions about transactions.
-6. **Two channels in, one channel out.** The forwarder's only input channels are Cloudflare Email Workers (email) and Telegram Bot API (SMS relay + messaging). No IMAP, no Twilio, no OAuth flows.
+5. **The forwarder is stateless.** It polls, parses, and dispatches. It does not store, retry-queue, or make decisions about transactions.
 
 ## Routing Table
 
-- Forwarder internals → area `AGENTS.md` will live at `forwarder/AGENTS.md` (not yet written — start from `docs/rules/python.md` + `docs/rules/security.md`)
-- Skills development → area `AGENTS.md` will live at `skills/AGENTS.md` (not yet written — start from `docs/rules/python.md`)
+- Forwarder internals → `docs/rules/python.md` + `docs/rules/security.md`
+- Skills development → `docs/rules/python.md` + `docs/rules/evals.md`
 - Hermes configuration → `config/` + `docs/architecture.md`
 - Onboarding a new team member → `docs/onboarding.md`

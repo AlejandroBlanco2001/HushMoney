@@ -36,8 +36,8 @@ HushMoney is a **single-user, self-hosted deployment**. One instance runs on EC2
 │               sanitizer/                                        │
 │          (strip OTP, account #, PII)                            │
 │                      │                                          │
-│               dispatcher/                                       │
-│          (emit clean payload via HTTP)                          │
+│               hermes.py                                         │
+│          (POST CleanPayload via HTTP)                           │
 └──────────────────────┬──────────────────────────────────────────┘
                        │
           { amount, currency, merchant,
@@ -90,22 +90,24 @@ Two channels in, one channel out. Stateless.
 | Module | Responsibility |
 |---|---|
 | `imap.py` | Poll Gmail IMAP, parse RFC 822 messages, resolve original sender |
-| `channels/telegram.py` | Receive Telegram bot updates via Bot API |
-| `sanitizer/` | Strip OTPs, account numbers, card numbers, PII from raw message |
-| `dispatcher/` | POST clean payload to Hermes gateway |
+| `channels/telegram.py` | Receive Telegram webhook updates (user-forwarded SMS) |
+| `sanitizer/` | Strip OTPs, account numbers, PII; extract structured `CleanPayload` |
+| `hermes.py` | POST `CleanPayload` to `gateway_server.py` via HTTP |
+| `config.py` | Load and validate configuration from environment variables |
+| `__main__.py` | Poll loop — `imap.py` → `sanitizer` → `hermes.py` |
 
 The forwarder holds no state, no database, no retry queue. If dispatch fails, the message is dropped — financial notifications are ephemeral by nature.
 
-**Clean payload schema:**
+**Gateway payload schema (`CleanPayload`):**
 ```json
 {
-  "amount": 42.50,
-  "currency": "USD",
-  "merchant": "Starbucks",
-  "date": "2026-10-17T09:15:00Z",
+  "amount": 45000.0,
+  "currency": "COP",
+  "date": "2026-10-20T18:00:00Z",
   "transaction_type": "debit",
   "account_type": "checking",
-  "channel": "email"
+  "channel": "email",
+  "merchant": "RAPPI"
 }
 ```
 
@@ -120,7 +122,7 @@ The forwarder holds no state, no database, no retry queue. If dispatch fails, th
 | `summaries` | Generate daily, weekly, monthly rollups on schedule or on demand |
 | `bank_learning` | Learn new bank notification formats from user-provided samples; fallback when sanitizer has no pattern match |
 
-All skills run inside the NVIDIA OpenShell sandbox. Policy at `config/openshell/policy.yaml`.
+All skills are loaded by Hermes at runtime from the `skills/` directory.
 
 ### Bank Learning Skill (`skills/bank_learning/`)
 
@@ -221,13 +223,12 @@ config/
 
 ## Data Flow: Happy Path (Email)
 
-1. Bank sends email to the user's Gmail: `"Debit of USD 42.50 at STARBUCKS — Account ending 1234. OTP: 882910"`
-2. Forwarder IMAP poller fetches it from Gmail inbox (polls every 5 min, searches UNSEEN from bank sender)
-3. Forwarder sanitizer strips account suffix and OTP → emits clean payload
-4. Dispatcher POSTs clean payload to Hermes gateway
+1. Bank sends email to the user's Gmail: `"Compra por $45,000 en RAPPI. Tarjeta terminada 1234."`
+2. Forwarder IMAP poller fetches it (polls every 5 min, searches UNSEEN from bank sender)
+3. Forwarder POSTs `{channel, from, subject, body}` to `gateway_server.py` on port 8080
+4. `gateway_server.py` invokes `hermes send` to deliver the message to the user's Telegram chat
 5. Hermes runs `expense_tracker` → stores in SQLite
-6. Hermes runs `categorizer` → tags as `dining`
-7. No Telegram message sent (digital transaction, fully resolved)
+6. Hermes runs `categorizer` → tags as `food`
 
 ## Data Flow: Cash Operation
 
@@ -250,7 +251,6 @@ Hermes runs `debt_tracker` skill → stores entry in SQLite. No forwarder involv
 
 - **AWS EC2 t2.micro** hosts Hermes and the forwarder (free tier)
 - **Elastic IP** keeps the instance address stable across restarts
-- **NVIDIA OpenShell** provides the sandboxed agent runtime
 - **NVIDIA open models** (via Nebius Serverless) handle all LLM inference
 - **SQLite** is local to the Hermes agent's persistent storage volume on EC2
 - The user's Telegram bot is the sole communication channel in both directions

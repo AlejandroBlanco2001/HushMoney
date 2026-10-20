@@ -98,22 +98,56 @@ The script will:
 
 ## Local development
 
+Start the full stack locally (Docker or Podman):
+
 ```sh
+# Docker
 HERMES_UID=$(id -u) HERMES_GID=$(id -g) docker compose up
+
+# Podman (NixOS)
+HERMES_UID=$(id -u) HERMES_GID=$(id -g) podman compose up
 ```
 
-This starts Hermes Agent and the Forwarder locally. SQLite data persists in the `hermes-data` Docker volume.
+SQLite data persists in the `hermes-data` volume across restarts.
 
 To rebuild after a Dockerfile change:
 
 ```sh
 docker compose up --build
+# or
+podman compose build --no-cache && podman compose up
 ```
 
 To run the forwarder in dry-run mode (logs emails, skips Hermes dispatch):
 
 ```sh
 set -a && source .env && set +a && DRY_RUN=true uv run python -m forwarder
+```
+
+### Testing the stack end-to-end
+
+With the stack running, send a fake bank transaction directly to the Hermes gateway:
+
+```sh
+source .env
+
+curl -s -X POST http://localhost:8080/gateway \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $HERMES_GATEWAY_SECRET" \
+  -d '{
+    "channel": "email",
+    "from": "alerts@bancolombia.com.co",
+    "subject": "Compra aprobada",
+    "body": "Bancolombia le informa: Compra por $45,000 en RAPPI. Tarjeta terminada 1234."
+  }'
+```
+
+If everything is wired up, Hermes will process the transaction and send a Telegram message to your `TELEGRAM_CHAT_ID`. Watch the logs in real time:
+
+```sh
+docker logs -f hermes
+# or
+podman logs -f hermes
 ```
 
 ## Rotating Nebius API keys
@@ -156,3 +190,10 @@ ssh -i ~/.ssh/hushmoney.pem ec2-user@<EC2_HOST> \
 **Docker Compose won't start on EC2**
 - SSH into the instance and run `docker compose logs` to see what failed
 - If it's a secret missing, re-run `./scripts/setup.sh --rotate-key` after fixing `.env`
+
+**Telegram: `Chat not found` error in hermes logs**
+- The bot has never received a message from you. Open Telegram, find your bot by username, and send `/start`.
+- After that the chat is open and `hermes send` can reach it.
+
+**Telegram: `No home channel set` error in hermes logs**
+- `TELEGRAM_CHAT_ID` is not set or empty. Confirm it's in `.env` and that the hermes container is reading it (`podman exec hermes env | grep TELEGRAM_CHAT_ID`).

@@ -110,6 +110,12 @@ if [[ "$ROTATE_KEY" == false ]]; then
         warn "Docker installed. You may need to re-run this script once (group membership refreshes on new shell)."
     fi
 
+    if ! ssh_ec2 "docker compose version &>/dev/null 2>&1"; then
+        info "Installing Docker Compose v2 plugin on EC2..."
+        # docker-compose-plugin is not in AL2023 repos; install the CLI plugin binary directly.
+        ssh_ec2 "sudo mkdir -p /usr/local/lib/docker/cli-plugins && sudo curl -fsSL https://github.com/docker/compose/releases/download/v2.27.1/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose && sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose"
+    fi
+
     if ! ssh_ec2 "test -d $REMOTE_DIR"; then
         info "Cloning repo to EC2..."
         ssh_ec2 "git clone $REPO_URL $REMOTE_DIR"

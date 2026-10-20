@@ -1,7 +1,5 @@
 #
-# docker-compose.yml — HushMoney local development
-#
-# Mirrors the production Fly.io layout so local and prod behave identically.
+# docker-compose.yml — HushMoney stack (local + EC2)
 #
 # Usage:
 #   cp .env.example .env && $EDITOR .env  # fill in secrets
@@ -10,7 +8,6 @@
 # Notes:
 #   - hermes-data volume persists SQLite and learned patterns across restarts.
 #   - Skills and config are bind-mounted read-only so edits take effect on restart.
-#   - The forwarder service is a placeholder; uncomment once forwarder/ is implemented.
 #
 
 services:
@@ -31,7 +28,8 @@ services:
       - NEBIUS_API_KEY=${NEBIUS_API_KEY}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
-    command: ["gateway", "run"]
+      - HERMES_GATEWAY_SECRET=${HERMES_GATEWAY_SECRET}
+    init: true
     ports:
       - "8080:8080"
 

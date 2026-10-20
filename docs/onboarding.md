@@ -88,6 +88,5 @@ The AI works best when you give it context. Compare:
 | **Hermes** | The AI agent at the core of HushMoney — it remembers transactions and generates summaries |
 | **Forwarder** | The service that receives your bank's messages and removes sensitive information before passing them to Hermes |
 | **Skill** | A specific capability Hermes has — like categorizing an expense or generating a weekly summary |
-| **OpenShell** | NVIDIA's sandbox that keeps the agent from doing things it shouldn't (like accessing files it doesn't need) |
 | **SQLite** | A lightweight database where Hermes stores all your transaction history |
-| **Clean payload** | A transaction record with all sensitive details removed — just amount, merchant, date, and type |
+| **Gateway** | The HTTP server inside the Hermes container that receives emails from the forwarder and passes them to Telegram |

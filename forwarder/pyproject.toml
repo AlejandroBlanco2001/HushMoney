@@ -63,8 +63,6 @@ select = [
   "ASYNC",# flake8-async
 ]
 ignore = [
-  "ANN101",  # missing type annotation for self
-  "ANN102",  # missing type annotation for cls
   "S101",    # use of assert (common in tests)
 ]
 
@@ -74,7 +72,7 @@ force-single-line = false
 lines-after-imports = 2
 
 [tool.ruff.lint.flake8-bugbear]
-extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Header"]
+extend-immutable-calls = []
 
 [tool.ruff.lint.pep8-naming]
 classmethod-decorators = ["classmethod", "pydantic.validator", "pydantic.root_validator"]
