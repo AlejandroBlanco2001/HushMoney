@@ -4,16 +4,12 @@
 # What this does:
 #   1. Checks required tools are installed
 #   2. Ensures .env exists and is populated
-#   3. Deploys the Cloudflare Email Worker
-#   4. Sets Cloudflare Worker secrets
-#   5. Bootstraps the EC2 instance (Docker + repo, first run only)
-#   6. Pushes secrets to the EC2 instance and starts the stack
-#   7. Wires the Cloudflare Worker's EMAIL_WEBHOOK_URL to the EC2 public URL
+#   3. Bootstraps the EC2 instance (Docker + repo, first run only)
+#   4. Pushes secrets to the EC2 instance and starts the stack
 #
 # Prerequisites (one-time, done by the AWS account owner):
 #   - Launch a t2.micro EC2 instance (Amazon Linux 2023 AMI, free tier)
 #   - Attach an Elastic IP so the URL stays stable across restarts
-#   - Open inbound port 9000 (forwarder HTTP) in the security group
 #   - Download the .pem key pair, chmod 400 it, set EC2_KEY_FILE in .env
 #
 # Run from the repo root:
@@ -26,7 +22,6 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="$REPO_ROOT/.env"
-CLOUDFLARE_DIR="$REPO_ROOT/config/cloudflare"
 REMOTE_DIR="/home/ec2-user/hushmoney"
 REPO_URL="https://github.com/AlejandroBlanco2001/Untyped.git"
 
@@ -68,8 +63,7 @@ done
 # ── Step 1: Check tools ────────────────────────────────────────────────────────
 
 info "Checking required tools..."
-require ssh     "should be pre-installed on your OS"
-require wrangler "npm install -g wrangler"
+require ssh "should be pre-installed on your OS"
 info "All tools present."
 
 # ── Step 2: .env ───────────────────────────────────────────────────────────────
@@ -83,33 +77,29 @@ fi
 NEBIUS_API_KEY="$(env_var NEBIUS_API_KEY)"
 TELEGRAM_BOT_TOKEN="$(env_var TELEGRAM_BOT_TOKEN)"
 TELEGRAM_CHAT_ID="$(env_var TELEGRAM_CHAT_ID)"
-EMAIL_WEBHOOK_SECRET="$(env_var EMAIL_WEBHOOK_SECRET)"
 HERMES_GATEWAY_SECRET="$(env_var HERMES_GATEWAY_SECRET)"
 EC2_HOST="$(env_var EC2_HOST)"
 EC2_USER="$(env_var EC2_USER)"
 EC2_KEY_FILE="$(eval echo "$(env_var EC2_KEY_FILE)")"  # expand ~ if present
+IMAP_HOST="$(env_var IMAP_HOST)"
+IMAP_USERNAME="$(env_var IMAP_USERNAME)"
+IMAP_PASSWORD="$(env_var IMAP_PASSWORD)"
+BANK_SENDER_EMAILS="$(env_var BANK_SENDER_EMAILS)"
 
-[[ -z "$NEBIUS_API_KEY"       || "$NEBIUS_API_KEY"       == *"your-"* ]] && error "NEBIUS_API_KEY not set in .env"
-[[ -z "$TELEGRAM_BOT_TOKEN"   || "$TELEGRAM_BOT_TOKEN"   == *"your-"* ]] && error "TELEGRAM_BOT_TOKEN not set in .env"
-[[ -z "$TELEGRAM_CHAT_ID"     || "$TELEGRAM_CHAT_ID"     == *"your-"* ]] && error "TELEGRAM_CHAT_ID not set in .env"
-[[ -z "$EMAIL_WEBHOOK_SECRET" || "$EMAIL_WEBHOOK_SECRET" == *"generate"* ]] && error "EMAIL_WEBHOOK_SECRET not set in .env"
-[[ -z "$EC2_HOST"             || "$EC2_HOST"             == *"your-"* ]] && error "EC2_HOST not set in .env"
-[[ ! -f "$EC2_KEY_FILE" ]] && error "EC2_KEY_FILE '$EC2_KEY_FILE' not found"
+[[ -z "$NEBIUS_API_KEY"     || "$NEBIUS_API_KEY"     == *"your-"* ]] && error "NEBIUS_API_KEY not set in .env"
+[[ -z "$TELEGRAM_BOT_TOKEN" || "$TELEGRAM_BOT_TOKEN" == *"your-"* ]] && error "TELEGRAM_BOT_TOKEN not set in .env"
+[[ -z "$TELEGRAM_CHAT_ID"   || "$TELEGRAM_CHAT_ID"   == *"your-"* ]] && error "TELEGRAM_CHAT_ID not set in .env"
+[[ -z "$EC2_HOST"           || "$EC2_HOST"           == *"your-"* ]] && error "EC2_HOST not set in .env"
+[[ -z "$IMAP_HOST"          ]] && error "IMAP_HOST not set in .env"
+[[ -z "$IMAP_USERNAME"      ]] && error "IMAP_USERNAME not set in .env"
+[[ -z "$IMAP_PASSWORD"      ]] && error "IMAP_PASSWORD not set in .env"
+[[ -z "$BANK_SENDER_EMAILS" ]] && error "BANK_SENDER_EMAILS not set in .env"
+[[ ! -f "$EC2_KEY_FILE"     ]] && error "EC2_KEY_FILE '$EC2_KEY_FILE' not found"
 
 EC2_USER="${EC2_USER:-ec2-user}"
 info ".env looks good."
 
-# ── Step 3 + 4: Cloudflare Worker ─────────────────────────────────────────────
-
-if [[ "$ROTATE_KEY" == false ]]; then
-    info "Deploying Cloudflare Email Worker..."
-    (cd "$CLOUDFLARE_DIR" && npx wrangler deploy)
-
-    info "Setting Cloudflare Worker secrets..."
-    echo "$EMAIL_WEBHOOK_SECRET" | (cd "$CLOUDFLARE_DIR" && npx wrangler secret put EMAIL_WEBHOOK_SECRET)
-fi
-
-# ── Step 5: Bootstrap EC2 (first run only) ────────────────────────────────────
+# ── Step 3: Bootstrap EC2 (first run only) ────────────────────────────────────
 
 if [[ "$ROTATE_KEY" == false ]]; then
     info "Checking EC2 instance at $EC2_HOST..."
@@ -129,34 +119,26 @@ if [[ "$ROTATE_KEY" == false ]]; then
     fi
 fi
 
-# ── Step 6: Push secrets + start stack ────────────────────────────────────────
+# ── Step 4: Push secrets + start stack ────────────────────────────────────────
 
 info "Writing .env to EC2..."
 ssh_ec2 "cat > $REMOTE_DIR/.env" <<EOF
 NEBIUS_API_KEY=$NEBIUS_API_KEY
 TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN
 TELEGRAM_CHAT_ID=$TELEGRAM_CHAT_ID
-EMAIL_WEBHOOK_SECRET=$EMAIL_WEBHOOK_SECRET
 HERMES_GATEWAY_SECRET=${HERMES_GATEWAY_SECRET:-}
 HERMES_GATEWAY_URL=http://hermes:8080/gateway
 HERMES_UID=1000
 HERMES_GID=1000
+IMAP_HOST=$IMAP_HOST
+IMAP_USERNAME=$IMAP_USERNAME
+IMAP_PASSWORD=$IMAP_PASSWORD
+BANK_SENDER_EMAILS=$BANK_SENDER_EMAILS
+POLL_INTERVAL_SECONDS=${POLL_INTERVAL_SECONDS:-300}
 EOF
 
 info "Starting stack on EC2..."
 ssh_ec2 "cd $REMOTE_DIR && docker compose pull 2>/dev/null; docker compose up -d --build"
-
-# ── Step 7: Wire Cloudflare → EC2 ─────────────────────────────────────────────
-
-if [[ "$ROTATE_KEY" == false ]]; then
-    WEBHOOK_URL="http://$EC2_HOST:9000/channels/email"
-    info "Wiring Cloudflare Worker → $WEBHOOK_URL"
-
-    sed -i "s|EMAIL_WEBHOOK_URL = \"https://REPLACE_ME/channels/email\"|EMAIL_WEBHOOK_URL = \"${WEBHOOK_URL}\"|" \
-        "$CLOUDFLARE_DIR/wrangler.toml"
-
-    (cd "$CLOUDFLARE_DIR" && npx wrangler deploy)
-fi
 
 # ── Done ───────────────────────────────────────────────────────────────────────
 
@@ -169,7 +151,6 @@ else
     echo "  EC2 instance:  $EC2_USER@$EC2_HOST"
     echo "  Stack logs:    ssh -i $EC2_KEY_FILE $EC2_USER@$EC2_HOST 'cd $REMOTE_DIR && docker compose logs -f'"
     echo "  Redeploy:      ssh -i $EC2_KEY_FILE $EC2_USER@$EC2_HOST 'cd $REMOTE_DIR && git pull && docker compose up -d --build'"
-    echo "  Cloudflare:    npx wrangler tail  (run in config/cloudflare/)"
     echo "  Local dev:     HERMES_UID=\$(id -u) HERMES_GID=\$(id -g) docker compose up"
     echo ""
 fi

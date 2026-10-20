@@ -1,21 +1,21 @@
 # Deployment Guide
 
-HushMoney runs on a single AWS EC2 t2.micro instance (free tier). One instance serves the whole team — everyone points their Cloudflare Worker and local dev at it.
+HushMoney runs on a single AWS EC2 t2.micro instance (free tier). The forwarder polls your Gmail inbox directly — no domain, no Cloudflare account, no webhook setup required.
 
 ## Architecture recap
 
 ```
-Bank email → Cloudflare Worker → EC2 (Forwarder + Hermes) → Telegram
-Bank SMS   → Telegram Bot      ↗
+Bank email → Gmail inbox → Forwarder (IMAP poll every 5 min) → Hermes → Telegram
+Bank SMS   → Telegram Bot ──────────────────────────────────────────────↗
 ```
 
-- **Cloudflare Email Worker** — serverless, always-on, no management needed
 - **EC2 t2.micro** — runs Forwarder + Hermes Agent via Docker Compose
-- **Nebius Serverless** — LLM inference (NVIDIA Nemotron 3 Nano), called by Hermes
+- **Gmail IMAP** — Forwarder polls for unread emails from your bank's sender address
+- **Nebius Serverless** — LLM inference (NVIDIA Nemotron Nano), called by Hermes
 
 ## First-time setup (AWS account owner)
 
-These steps are done once by whoever owns the AWS account. Skip to [Team setup](#team-setup) if the instance is already running.
+These steps are done once by whoever owns the AWS account.
 
 ### 1. Launch the EC2 instance
 
@@ -25,12 +25,11 @@ These steps are done once by whoever owns the AWS account. Skip to [Team setup](
 4. Key pair: create a new one (`hushmoney`), download the `.pem` file
 5. Security group — add inbound rules:
    - SSH (port 22) — your IP only
-   - Custom TCP (port 9000) — 0.0.0.0/0 (forwarder webhook, needed by Cloudflare)
 6. Launch
 
 ### 2. Attach an Elastic IP
 
-Without an Elastic IP the public IP changes every time the instance restarts, which breaks the Cloudflare Worker's webhook URL.
+Without an Elastic IP the public IP changes every time the instance restarts.
 
 1. EC2 console → **Elastic IPs** → Allocate Elastic IP address
 2. Actions → **Associate** → select your instance
@@ -42,13 +41,21 @@ Without an Elastic IP the public IP changes every time the instance restarts, wh
 chmod 400 ~/.ssh/hushmoney.pem
 ```
 
+### 4. Set up Gmail App Password
+
+The forwarder authenticates to Gmail using an App Password (regular passwords are blocked by Google for IMAP).
+
+1. Enable IMAP: Gmail Settings → See all settings → **Forwarding and POP/IMAP** → Enable IMAP
+2. Generate App Password: [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) → name it "hushmoney" → copy the 16-character password
+
+> **Outlook users:** set up a forwarding rule in Outlook to forward bank emails to your Gmail, then use your Gmail address and App Password here. Set `BANK_SENDER_EMAILS` to your Outlook address (that's who Gmail will see as the sender).
+
 ## Team setup
 
-Every team member runs this once to get their local environment connected to the shared EC2 instance.
+Every team member runs this once to get their local environment connected.
 
 ### Prerequisites
 
-- [wrangler](https://developers.cloudflare.com/workers/wrangler/install-and-update/) — `npm install -g wrangler`
 - [Docker](https://docs.docker.com/get-docker/) — for local development
 - The `.pem` key file — get it from the team shared folder (never commit it)
 - A [Nebius](https://nebius.com) account with Token Factory credits
@@ -72,9 +79,11 @@ Fill in these values in `.env`:
 | `NEBIUS_API_KEY` | [Nebius console](https://studio.nebius.com) → API Keys |
 | `TELEGRAM_BOT_TOKEN` | Create a bot via [@BotFather](https://t.me/BotFather) |
 | `TELEGRAM_CHAT_ID` | Send `/start` to [@userinfobot](https://t.me/userinfobot) |
-| `EMAIL_WEBHOOK_SECRET` | Generate: `openssl rand -hex 32` |
-| `HERMES_GATEWAY_SECRET` | Generate: `openssl rand -hex 32` |
-| `EC2_HOST` | Elastic IP from the AWS console |
+| `IMAP_HOST` | `imap.gmail.com` (or your provider) |
+| `IMAP_USERNAME` | Your full Gmail address |
+| `IMAP_PASSWORD` | 16-char App Password from Google |
+| `BANK_SENDER_EMAILS` | Comma-separated sender addresses from your bank |
+| `EC2_HOST` | Elastic IP from AWS console |
 | `EC2_KEY_FILE` | Path to `hushmoney.pem` on your machine |
 
 ```sh
@@ -83,11 +92,9 @@ Fill in these values in `.env`:
 ```
 
 The script will:
-- Deploy the Cloudflare Email Worker
 - Bootstrap Docker on the EC2 instance (first run only)
 - Push secrets to the instance
-- Start Hermes Agent via Docker Compose
-- Wire the Cloudflare Worker's webhook URL to the EC2 instance
+- Start Hermes Agent + Forwarder via Docker Compose
 
 ## Local development
 
@@ -95,12 +102,18 @@ The script will:
 HERMES_UID=$(id -u) HERMES_GID=$(id -g) docker compose up
 ```
 
-This starts Hermes Agent locally with the skills and config from the repo mounted read-only. SQLite data persists in the `hermes-data` Docker volume.
+This starts Hermes Agent and the Forwarder locally. SQLite data persists in the `hermes-data` Docker volume.
 
 To rebuild after a Dockerfile change:
 
 ```sh
 docker compose up --build
+```
+
+To run the forwarder in dry-run mode (logs emails, skips Hermes dispatch):
+
+```sh
+set -a && source .env && set +a && DRY_RUN=true uv run python -m forwarder
 ```
 
 ## Rotating Nebius API keys
@@ -125,9 +138,6 @@ ssh -i ~/.ssh/hushmoney.pem ec2-user@<EC2_HOST> \
 # Redeploy after a git push (no secrets change needed)
 ssh -i ~/.ssh/hushmoney.pem ec2-user@<EC2_HOST> \
   'cd hushmoney && git pull && docker compose up -d --build'
-
-# Tail Cloudflare Worker logs
-cd config/cloudflare && npx wrangler tail
 ```
 
 ## Troubleshooting
@@ -137,10 +147,11 @@ cd config/cloudflare && npx wrangler tail
 - Confirm `chmod 400` was applied to the `.pem` file
 - Confirm the EC2 security group allows inbound SSH from your current IP
 
-**Cloudflare Worker can't reach the forwarder**
-- Check the EC2 security group has port 9000 open to `0.0.0.0/0`
-- Confirm the Elastic IP is attached (EC2 console → Instances → check Public IPv4)
-- Check `wrangler.toml` has the correct `EMAIL_WEBHOOK_URL`
+**Forwarder not picking up emails**
+- Check `BANK_SENDER_EMAILS` matches the exact sender address in your bank's emails
+- Confirm IMAP is enabled in Gmail settings
+- Confirm the App Password is 16 characters with no spaces
+- SSH into EC2 and run `docker compose logs forwarder` to see poll results
 
 **Docker Compose won't start on EC2**
 - SSH into the instance and run `docker compose logs` to see what failed

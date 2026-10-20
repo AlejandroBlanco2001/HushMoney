@@ -2,7 +2,7 @@
 
 ## Deployment Model
 
-HushMoney is a **single-user, self-hosted deployment**. One instance runs on Nebius for one person. There is no multi-tenancy, no shared infrastructure, no centralized service. The user owns the bot token, the email address, the Nebius instance, and the SQLite database. Nothing is shared.
+HushMoney is a **single-user, self-hosted deployment**. One instance runs on EC2 for one person. There is no multi-tenancy, no shared infrastructure, no centralized service. The user owns the bot token, the Gmail account, the EC2 instance, and the SQLite database. Nothing is shared.
 
 ## System Overview
 
@@ -13,13 +13,14 @@ HushMoney is a **single-user, self-hosted deployment**. One instance runs on Neb
 │   Bank email notification          Bank SMS / Telegram message  │
 │          │                                    │                 │
 │          ▼                                    ▼                 │
-│  Gmail/Outlook forwarding rule      User forwards to their      │
-│  → user@hushmoney-deploy.dev        private @TheirOwnBot        │
+│   Gmail inbox (bank sets up        User forwards to their       │
+│   email alerts to Gmail)           private @TheirOwnBot         │
 └────────────┬──────────────────────────────────┬─────────────────┘
              │                                  │
              ▼                                  ▼
-   Cloudflare Email Worker              Telegram Bot API
-   (inbound email → HTTP POST)          (long-poll or webhook)
+   IMAP Poller (polls Gmail              Telegram Bot API
+   every 5 min for unseen               (long-poll or webhook)
+   emails from bank senders)
              │                                  │
              └──────────────┬───────────────────┘
                             │
@@ -28,7 +29,7 @@ HushMoney is a **single-user, self-hosted deployment**. One instance runs on Neb
 │                         Forwarder                               │
 │                        (Python 3.12)                            │
 │                                                                 │
-│   channels/email.py          channels/telegram.py               │
+│   imap.py (poll + parse)     channels/telegram.py               │
 │         │                          │                            │
 │         └────────────┬─────────────┘                            │
 │                      │                                          │
@@ -68,11 +69,13 @@ HushMoney is a **single-user, self-hosted deployment**. One instance runs on Neb
 
 ## Component Responsibilities
 
-### Cloudflare Email Worker
+### IMAP Poller (`forwarder/src/forwarder/imap.py`)
 
-Receives inbound forwarded emails from the user's email client. Converts the email to an HTTP POST and sends it to the forwarder's email channel endpoint. No credentials stored on the user's side — they configure one forwarding rule in Gmail/Outlook, done.
+Polls the user's Gmail inbox every 5 minutes (configurable via `POLL_INTERVAL_SECONDS`). Connects via IMAP4_SSL using an App Password. For each configured bank sender address, searches for UNSEEN messages, parses them, marks them as seen, and dispatches to Hermes.
 
-Configuration lives in `config/cloudflare/`. The worker URL is an env var (`EMAIL_WEBHOOK_URL`).
+Supports auto-forwarded emails: if the email contains `X-Original-From` or `X-Forwarded-From` headers (set by Outlook and other MTAs when forwarding via rules), the original bank sender is recovered from those headers rather than the forwarding address.
+
+No domain, no webhook, no third-party routing service required.
 
 ### Telegram Bot (user-owned)
 
@@ -86,11 +89,10 @@ Two channels in, one channel out. Stateless.
 
 | Module | Responsibility |
 |---|---|
-| `channels/email.py` | Receive HTTP POST from Cloudflare Email Worker |
+| `imap.py` | Poll Gmail IMAP, parse RFC 822 messages, resolve original sender |
 | `channels/telegram.py` | Receive Telegram bot updates via Bot API |
 | `sanitizer/` | Strip OTPs, account numbers, card numbers, PII from raw message |
 | `dispatcher/` | POST clean payload to Hermes gateway |
-| `confirm.py` | `/confirm` endpoint — receives Gmail confirmation code intercepted by Cloudflare and relays it to Hermes during automated setup |
 
 The forwarder holds no state, no database, no retry queue. If dispatch fails, the message is dropped — financial notifications are ephemeral by nature.
 
@@ -195,22 +197,6 @@ Hermes: stores pattern in SQLite (layer ②)
         community repo (tests/fixtures/) if they want
 ```
 
-**Contributing a learned pattern back:**
-
-If the user confirms a pattern is working correctly after a week of real transactions,
-Hermes can generate the fixture files and prompt:
-
-```
-Hermes → Telegram: "Davivienda patterns have been working for 7 days with
-                    no corrections. Want me to generate fixtures for the
-                    community repo so others benefit too?"
-User: "yes"
-Hermes: writes tests/fixtures/emails/davivienda/ and sms/davivienda/
-        with synthetic samples matching the learned pattern
-```
-
-User opens a PR — the pattern enters the community layer.
-
 **Security exception — raw message access:**
 
 In reactive mode only, Hermes briefly accesses the raw pre-sanitization message to
@@ -223,78 +209,11 @@ Constraints that must be enforced:
 - Once the pattern is stored, all subsequent messages from that bank are sanitized before Hermes sees them
 - If the user declines to confirm the inferred transaction, the raw content is discarded and the transaction is dropped
 
-### Setup Skill (`skills/setup/`)
-
-Hermes orchestrates the entire setup without the user having to click anything in a browser. It uses the **Playwright MCP server** to drive the user's already-logged-in Chrome, with **Human-in-the-Loop (HITL) checkpoints** via Telegram before any significant action.
-
-The Cloudflare Email Worker intercepts Gmail's confirmation email during setup and relays the code to the forwarder's `/confirm` endpoint, which passes it back to Hermes — so even the email confirmation step is handled automatically.
-
-```
-User → Telegram: "hermes setup"
-
-── Phase 1: Telegram bot ───────────────────────────────────────────
-Hermes → Telegram: "Open @BotFather, send /newbot, paste the token here."
-User → Telegram: [pastes token]
-Hermes: stores token, validates it works
-
-── Phase 2: Gmail forwarding (automated via Playwright MCP) ────────
-Hermes → Playwright MCP: open Chrome (user's existing profile, already logged in)
-Hermes → Playwright MCP: navigate to Gmail Settings → Forwarding
-Hermes → Telegram (HITL checkpoint):
-  "I'm about to add a forwarding address to your Gmail.
-   [screenshot attached]
-   Confirm to proceed, or cancel."
-User → Telegram: "confirm"
-Hermes → Playwright MCP: add hushmoney address, submit
-
-  [Gmail sends a confirmation email to the HushMoney address]
-  [Cloudflare Email Worker intercepts it, POSTs to forwarder /confirm]
-  [Forwarder extracts the 9-digit code, calls Hermes]
-
-Hermes → Playwright MCP: enter confirmation code, click verify
-Hermes → Telegram (HITL checkpoint):
-  "Forwarding confirmed. Now add a filter so only your bank's
-   emails forward (not everything). Which bank?"
-User → Telegram: "Santander"
-Hermes → Playwright MCP: create Gmail filter for sender address, save
-Hermes → Telegram: "Filter set. Send a test transaction and I'll confirm receipt."
-
-── Phase 3: SMS redirect (Android) ─────────────────────────────────
-Hermes → Telegram: "For SMS alerts: do you use Android or iOS?"
-User → Telegram: "Android"
-Hermes → Playwright MCP: open Tasker profile download page (or generate profile XML)
-Hermes → Telegram:
-  "Download this Tasker profile and import it. It will auto-forward
-   bank SMS to this bot. [file attached / link]
-   Reply 'done' once imported."
-User → Telegram: "done"
-Hermes → Telegram: "Send yourself a test SMS or wait for the next bank alert."
-
-── Phase 4: Verification ────────────────────────────────────────────
-Hermes waits up to 10 minutes for a test payload to arrive via either channel.
-Hermes → Telegram: "All set. HushMoney is running."
-```
-
-**HITL checkpoints** — Hermes asks for confirmation before:
-- Adding the Gmail forwarding address
-- Creating the Gmail filter
-- Any step that writes to external services
-
-After setup completes, the `setup` skill marks itself done and will not re-run unless explicitly reset with `hermes setup --reset`.
-
-**SMS redirect — Android vs. iOS:**
-
-| Platform | Approach |
-|---|---|
-| Android | Hermes generates a Tasker profile XML pre-configured with the bot token and bank sender numbers. User imports it — one tap. Auto-forwards matching SMS to the Telegram bot with no further action. |
-| iOS | Apple's sandbox prevents background SMS interception. Best path: switch bank notification channel from SMS to email in the banking app settings. Hermes guides this via Playwright (bank's web portal) using the same HITL pattern. Alternatively, iOS Shortcuts can be triggered by banking app push notifications and POST to the forwarder webhook — Hermes provides the Shortcut as a downloadable `.shortcut` file. |
-
 ### Config (`config/`)
 
 ```
 config/
 ├── hermes.yaml          # Hermes runtime config — no secrets
-├── cloudflare/          # Cloudflare Email Worker script and wrangler config
 ├── openshell/
 │   └── policy.yaml      # Sandbox policy — filesystem + network constraints
 └── prompts/             # System prompts and skill prompt templates
@@ -302,14 +221,13 @@ config/
 
 ## Data Flow: Happy Path (Email)
 
-1. Bank sends email: `"Debit of USD 42.50 at STARBUCKS — Account ending 1234. OTP: 882910"`
-2. Gmail forwarding rule sends it to `hushmoney-abc123@your-deploy.dev`
-3. Cloudflare Email Worker receives it, POSTs raw content to forwarder `/channels/email`
-4. Forwarder sanitizer strips account suffix and OTP → emits clean payload
-5. Dispatcher POSTs clean payload to Hermes gateway
-6. Hermes runs `expense_tracker` → stores in SQLite
-7. Hermes runs `categorizer` → tags as `dining`
-8. No Telegram message sent (digital transaction, fully resolved)
+1. Bank sends email to the user's Gmail: `"Debit of USD 42.50 at STARBUCKS — Account ending 1234. OTP: 882910"`
+2. Forwarder IMAP poller fetches it from Gmail inbox (polls every 5 min, searches UNSEEN from bank sender)
+3. Forwarder sanitizer strips account suffix and OTP → emits clean payload
+4. Dispatcher POSTs clean payload to Hermes gateway
+5. Hermes runs `expense_tracker` → stores in SQLite
+6. Hermes runs `categorizer` → tags as `dining`
+7. No Telegram message sent (digital transaction, fully resolved)
 
 ## Data Flow: Cash Operation
 
@@ -330,11 +248,11 @@ Hermes runs `debt_tracker` skill → stores entry in SQLite. No forwarder involv
 
 ## Infrastructure
 
-- **Nebius Serverless** hosts Hermes and the forwarder
+- **AWS EC2 t2.micro** hosts Hermes and the forwarder (free tier)
+- **Elastic IP** keeps the instance address stable across restarts
 - **NVIDIA OpenShell** provides the sandboxed agent runtime
-- **NVIDIA open models** (via Nebius) handle all LLM inference
-- **Cloudflare Email Workers** handles inbound email (free tier, zero server management)
-- **SQLite** is local to the Hermes agent's persistent storage volume on Nebius
+- **NVIDIA open models** (via Nebius Serverless) handle all LLM inference
+- **SQLite** is local to the Hermes agent's persistent storage volume on EC2
 - The user's Telegram bot is the sole communication channel in both directions
 
 ## Privacy Properties
@@ -342,7 +260,8 @@ Hermes runs `debt_tracker` skill → stores entry in SQLite. No forwarder involv
 Because this is a single-user self-hosted deployment:
 
 - The Telegram bot token belongs to the user — no third party can read their messages
-- The forwarding email address resolves to their Nebius instance — no shared mailbox
-- The SQLite database never leaves their Nebius volume
+- Gmail credentials (App Password) are stored only in the user's `.env` on their EC2 instance
+- The SQLite database never leaves their EC2 volume
 - The OpenShell policy prevents the agent from reaching outside its allowed endpoints
 - Raw financial notifications are sanitized before Hermes ever sees them
+- No email content transits third-party routing services — the forwarder polls Gmail directly
