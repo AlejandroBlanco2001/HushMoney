@@ -36,7 +36,7 @@ target-version = "py312"
 
 [tool.ruff.format]
 quote-style = "single"
-magic-trailing-comma = true
+skip-magic-trailing-comma = false
 indent-style = "space"
 docstring-code-format = true
 

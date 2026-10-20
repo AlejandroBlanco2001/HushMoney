@@ -4,6 +4,7 @@ import logging
 import time
 
 from forwarder import config, hermes, imap
+from forwarder.sanitizer import sanitize
 
 
 logging.basicConfig(
@@ -21,14 +22,14 @@ def poll(cfg: config.Config) -> None:
         return
 
     for e in emails:
-        log.info('email | from=%s | subject=%s | body=%s', e.from_, e.subject, e.body)
-        if cfg.dry_run:
-            log.info('[dry-run] skipping hermes dispatch')
+        payload = sanitize(e.body, channel='email')
+        if payload is None:
+            log.info('pattern not matched, email dropped')
             continue
         try:
-            hermes.dispatch(e, cfg.hermes_gateway_url, cfg.hermes_gateway_secret)
+            hermes.dispatch(payload, cfg.hermes_gateway_url, cfg.hermes_gateway_secret)
         except Exception:
-            log.exception('hermes dispatch failed from=%s', e.from_)
+            log.exception('hermes dispatch failed')
 
 
 def main() -> None:
