@@ -109,3 +109,14 @@ CREATE TABLE IF NOT EXISTS learned_patterns (
 
 CREATE INDEX IF NOT EXISTS idx_patterns_bank    ON learned_patterns(bank_slug, country, channel);
 CREATE INDEX IF NOT EXISTS idx_patterns_active  ON learned_patterns(active);
+
+-- ── User Settings ──────────────────────────────────────────────────────────
+-- Key/value store for user preferences and setup state.
+-- Keys: setup_complete, setup_step, email_provider, imap_host, imap_port,
+--       imap_username, bank_sender_emails, locale, sms_channel_enabled.
+
+CREATE TABLE IF NOT EXISTS user_settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);

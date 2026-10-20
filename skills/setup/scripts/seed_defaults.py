@@ -1,0 +1,53 @@
+"""
+Ensures user_settings rows exist and returns current setup state as JSON.
+Safe to run multiple times — only inserts rows that don't already exist.
+
+Output JSON:
+  { "setup_complete": "true"|"false", "setup_step": "<step>" }
+"""
+from __future__ import annotations
+
+import json
+import os
+import sqlite3
+from datetime import UTC, datetime
+
+
+DB_PATH = os.environ.get('HUSHMONEY_DB', os.path.expanduser('~/.hermes/hushmoney.db'))
+
+DEFAULTS: dict[str, str] = {
+    'setup_complete':      'false',
+    'setup_step':          'start',
+    'email_provider':      '',
+    'imap_host':           '',
+    'imap_port':           '993',
+    'imap_username':       '',
+    'bank_sender_emails':  '',
+    'sms_channel_enabled': 'false',
+}
+
+
+def main() -> None:
+    con = sqlite3.connect(DB_PATH)
+    con.row_factory = sqlite3.Row
+    now = datetime.now(UTC).isoformat()
+
+    with con:
+        for key, value in DEFAULTS.items():
+            con.execute(
+                'INSERT OR IGNORE INTO user_settings (key, value, updated_at) VALUES (?, ?, ?)',
+                (key, value, now),
+            )
+
+    rows = con.execute('SELECT key, value FROM user_settings').fetchall()
+    settings = {row['key']: row['value'] for row in rows}
+    con.close()
+
+    print(json.dumps({
+        'setup_complete': settings.get('setup_complete', 'false'),
+        'setup_step':     settings.get('setup_step', 'start'),
+    }))
+
+
+if __name__ == '__main__':
+    main()
