@@ -15,6 +15,9 @@
 # Run from the repo root:
 #   ./scripts/setup.sh
 #
+# Enable OpenShell sandboxing on EC2 (requires kernel 6.2+ — update your AMI first):
+#   ./scripts/setup.sh --with-openshell
+#
 # Rotate Nebius API key (when someone's credits run out):
 #   ./scripts/setup.sh --rotate-key
 
@@ -53,9 +56,11 @@ ssh_ec2() {
 # ── Argument parsing ───────────────────────────────────────────────────────────
 
 ROTATE_KEY=false
+WITH_OPENSHELL=false
 for arg in "$@"; do
     case $arg in
-        --rotate-key) ROTATE_KEY=true ;;
+        --rotate-key)     ROTATE_KEY=true ;;
+        --with-openshell) WITH_OPENSHELL=true ;;
         *) error "Unknown argument: $arg" ;;
     esac
 done
@@ -143,8 +148,57 @@ BANK_SENDER_EMAILS=$BANK_SENDER_EMAILS
 POLL_INTERVAL_SECONDS=${POLL_INTERVAL_SECONDS:-300}
 EOF
 
-info "Starting stack on EC2..."
-ssh_ec2 "cd $REMOTE_DIR && docker compose pull 2>/dev/null; docker compose up -d --build"
+if [[ "$WITH_OPENSHELL" == true ]]; then
+    # ── OpenShell path ─────────────────────────────────────────────────────────
+    # Requires kernel 6.2+ on EC2. Check first — AL2023 default ships 6.1.
+    EC2_KERNEL="$(ssh_ec2 "uname -r")"
+    EC2_MAJOR_MINOR="$(echo "$EC2_KERNEL" | grep -oP '^\d+\.\d+')"
+    if ! awk "BEGIN{exit !($EC2_MAJOR_MINOR >= 6.2)}"; then
+        error "EC2 kernel $EC2_KERNEL is below 6.2 — OpenShell requires 6.2+.
+  Update your AMI: launch a new AL2023 instance (kernel 6.6+) or switch to Ubuntu 24.04,
+  then update EC2_HOST in .env and re-run setup.sh."
+    fi
+
+    info "Installing OpenShell on EC2..."
+    ssh_ec2 "command -v openshell &>/dev/null || curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh"
+
+    info "Configuring OpenShell gateway on EC2..."
+    ssh_ec2 "mkdir -p ~/.config/openshell && cp $REMOTE_DIR/config/openshell/gateway.toml ~/.config/openshell/gateway.toml"
+
+    info "Registering Nebius provider on EC2..."
+    ssh_ec2 "openshell provider list 2>/dev/null | grep -q nebius || \
+        openshell provider create nebius \
+            --endpoint https://api.studio.nebius.ai/v1/ \
+            --api-key $NEBIUS_API_KEY"
+
+    info "Syncing secrets into OpenShell on EC2..."
+    ssh_ec2 "openshell secret set TELEGRAM_BOT_TOKEN  '$TELEGRAM_BOT_TOKEN'"
+    ssh_ec2 "openshell secret set TELEGRAM_CHAT_ID    '$TELEGRAM_CHAT_ID'"
+    ssh_ec2 "openshell secret set HERMES_GATEWAY_SECRET '${HERMES_GATEWAY_SECRET:-}'"
+
+    info "Applying sandbox policy on EC2..."
+    ssh_ec2 "cd $REMOTE_DIR && openshell policy set hushmoney --policy config/openshell/policy.yaml --wait"
+
+    info "Registering sandbox profile on EC2..."
+    ssh_ec2 "cd $REMOTE_DIR && (openshell profile list 2>/dev/null | grep -q hushmoney \
+        && openshell profile update config/openshell/profile.yaml \
+        || openshell profile register config/openshell/profile.yaml)"
+
+    info "Building hermes image on EC2..."
+    ssh_ec2 "cd $REMOTE_DIR && docker build -t hushmoney-hermes ."
+
+    info "Recreating sandbox on EC2..."
+    ssh_ec2 "openshell sandbox stop  hushmoney-1 2>/dev/null || true"
+    ssh_ec2 "openshell sandbox delete hushmoney-1 2>/dev/null || true"
+    ssh_ec2 "openshell sandbox create --from hushmoney --name hushmoney-1"
+
+    info "Starting forwarder on EC2..."
+    ssh_ec2 "cd $REMOTE_DIR && docker compose up -d forwarder"
+else
+    # ── Standard path (no OpenShell) ───────────────────────────────────────────
+    info "Starting stack on EC2..."
+    ssh_ec2 "cd $REMOTE_DIR && docker compose pull 2>/dev/null; docker compose up -d --build"
+fi
 
 # ── Done ───────────────────────────────────────────────────────────────────────
 
@@ -157,6 +211,6 @@ else
     echo "  EC2 instance:  $EC2_USER@$EC2_HOST"
     echo "  Stack logs:    ssh -i $EC2_KEY_FILE $EC2_USER@$EC2_HOST 'cd $REMOTE_DIR && docker compose logs -f'"
     echo "  Redeploy:      ssh -i $EC2_KEY_FILE $EC2_USER@$EC2_HOST 'cd $REMOTE_DIR && git pull && docker compose up -d --build'"
-    echo "  Local dev:     HERMES_UID=\$(id -u) HERMES_GID=\$(id -g) docker compose up"
+    echo "  Local dev:     ./scripts/dev.sh"
     echo ""
 fi
