@@ -51,7 +51,7 @@ def _fetch_from_sender(conn: imaplib.IMAP4_SSL, sender: str) -> list[Email]:
         msg = email.message_from_bytes(raw_bytes)
         body = _extract_plain_text(msg)
         if not body:
-            log.warning('skipping email with no plain-text body (seq=%s from=%s)', seq, sender)
+            log.warning('skipping email with no plain-text body')
             continue
 
         results.append(Email(
@@ -72,10 +72,10 @@ def _resolve_original_sender(msg: email.message.Message) -> str:
         value = msg.get(header, '')
         if value:
             resolved = _decode_header(value)
-            log.info('sender resolved via %s → %s', header, resolved)
+            log.info('sender resolved via forwarding header')
             return resolved
     fallback = _decode_header(msg.get('From', ''))
-    log.info('sender resolved via From (no forwarding headers found) → %s', fallback)
+    log.info('sender resolved via From header')
     return fallback
 
 

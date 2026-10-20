@@ -1,7 +1,6 @@
 {
   "amount": 200000.00,
   "currency": "COP",
-  "merchant": null,
   "date": "2026-10-19T19:30:00Z",
   "transaction_type": "cash",
   "account_type": "checking",
