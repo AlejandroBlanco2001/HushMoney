@@ -1,0 +1,6 @@
+[openshell]
+version = 2
+
+# compute_driver is intentionally unset — OpenShell auto-detects Podman on dev
+# machines and Docker on EC2. Override to "podman" or "docker" if it fails.
+[openshell.gateway]

@@ -1,0 +1,82 @@
+# HushMoney — OpenShell sandbox policy
+#
+# Enforcement layers:
+#   Filesystem  Landlock LSM — agent can only write to its data dir and /tmp
+#   Syscalls    Seccomp BPF  — blocks privilege escalation and dangerous calls
+#   Network     OPA proxy    — egress limited to inference.local and api.telegram.org
+#
+# Schema: NVIDIA/NemoClaw v0.1.0 reference blueprint.
+# Binary path: /usr/local/bin/hermes (symlinked from /root/.local/bin/hermes
+# in the Dockerfile so the OpenShell sandbox user can execute it).
+#
+# Apply:
+#   openshell policy set hushmoney --policy config/openshell/policy.yaml --wait
+
+version: 1
+
+filesystem_policy:
+  include_workdir: true
+  read_only:
+    - /usr
+    - /lib
+    - /lib64
+    - /bin
+    - /etc/ssl
+    - /etc/resolv.conf
+    - /etc/passwd
+    - /etc/group
+    - /opt/data/skills       # Hermes skills (bind-mounted ro by docker-compose)
+    - /opt/data/hermes.yaml  # Hermes config (bind-mounted ro by docker-compose)
+  read_write:
+    - /root/.hermes          # Hermes state, SQLite, auth tokens
+    - /opt/data              # Hermes persistent volume (skills writes, db)
+    - /tmp
+    - /app                   # gateway_server.py lives here
+
+landlock:
+  compatibility: best_effort
+
+process:
+  run_as_user: root
+  run_as_group: root
+
+network_policies:
+  # ── OpenShell inference router ──────────────────────────────────────────
+  # Calls to inference.local inside the sandbox are intercepted and routed
+  # to Nebius by OpenShell. The Nebius API key never enters the container.
+  inference_local:
+    name: inference_local
+    endpoints:
+      - host: inference.local
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: "*", path: "/**" }
+      - host: inference.local
+        port: 80
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: "*", path: "/**" }
+    binaries:
+      - { path: /usr/local/bin/hermes }
+
+  # ── Telegram Bot API ────────────────────────────────────────────────────
+  # hermes gateway run polls getUpdates and sends messages via sendMessage.
+  # All other Telegram endpoints are blocked.
+  telegram:
+    name: telegram
+    endpoints:
+      - host: api.telegram.org
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/bot*/**" }
+          - allow: { method: POST, path: "/bot*/**" }
+    binaries:
+      - { path: /usr/local/bin/hermes }

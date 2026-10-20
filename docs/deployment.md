@@ -150,6 +150,86 @@ docker logs -f hermes
 podman logs -f hermes
 ```
 
+## OpenShell sandbox (optional — local dev + EC2)
+
+OpenShell wraps the Hermes container with three kernel-level enforcement layers:
+filesystem (Landlock), syscalls (Seccomp BPF), and network egress (OPA proxy).
+The Nebius API key is managed by OpenShell and never enters the container.
+
+**Prerequisites:** Linux 6.2+, Podman 5.x / Docker 28+ (your dev machine already qualifies).
+EC2 requires updating to a newer AL2023 AMI (kernel 6.6+) first.
+
+### 1. Install OpenShell
+
+```sh
+curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
+openshell status   # should print gateway running at https://127.0.0.1:17670
+```
+
+### 2. Configure the gateway (first time only)
+
+OpenShell auto-detects Podman on your machine. The config is already in the repo:
+
+```sh
+cp config/openshell/gateway.toml ~/.config/openshell/gateway.toml
+openshell-gateway config preflight --path ~/.config/openshell/gateway.toml
+```
+
+### 3. Register the Nebius inference provider (first time only)
+
+This stores your API key in OpenShell — it never enters the Hermes container:
+
+```sh
+openshell provider create nebius \
+  --endpoint https://api.studio.nebius.ai/v1/ \
+  --api-key $NEBIUS_API_KEY
+```
+
+### 4. Register secrets
+
+```sh
+openshell secret set TELEGRAM_BOT_TOKEN "$TELEGRAM_BOT_TOKEN"
+openshell secret set TELEGRAM_CHAT_ID "$TELEGRAM_CHAT_ID"
+openshell secret set HERMES_GATEWAY_SECRET "$HERMES_GATEWAY_SECRET"
+```
+
+### 5. Register the profile and apply the policy
+
+```sh
+openshell policy set hushmoney --policy config/openshell/policy.yaml --wait
+openshell profile register config/openshell/profile.yaml
+```
+
+### 6. Start the sandboxed stack
+
+Build the image first, then create the sandbox in place of `podman compose up`:
+
+```sh
+podman build -t hushmoney-hermes .
+
+openshell sandbox create --from hushmoney --name hushmoney-1
+```
+
+The forwarder still runs outside the sandbox via the normal compose command:
+
+```sh
+HERMES_UID=$(id -u) HERMES_GID=$(id -g) podman compose up forwarder
+```
+
+### Verifying the sandbox
+
+```sh
+openshell sandbox list          # should show hushmoney-1 as running
+openshell sandbox logs hushmoney-1 --follow
+```
+
+Try making a blocked network call from inside the sandbox to confirm enforcement:
+
+```sh
+openshell sandbox exec hushmoney-1 -- curl https://google.com
+# Expected: connection blocked by policy
+```
+
 ## Rotating Nebius API keys
 
 Each team member has $25 in Token Factory credits. When someone's key runs out:

@@ -21,6 +21,10 @@ RUN curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
 
 ENV PATH="/root/.local/bin:$PATH"
 
+# Symlink hermes to /usr/local/bin so OpenShell's sandbox user can execute it
+# (OpenShell binds network/filesystem policy rules to the binary path)
+RUN ln -sf /root/.local/bin/hermes /usr/local/bin/hermes
+
 # HTTP gateway server deps
 RUN python3 -m pip install --no-cache-dir --break-system-packages starlette uvicorn
 
