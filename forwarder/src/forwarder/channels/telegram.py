@@ -34,15 +34,15 @@ class Message(TypedDict):
     forwarded: bool
 
 
-def _mapping(value: object) -> dict[str, object]:
+def _as_mapping(value: object) -> dict[str, object]:
     return cast('dict[str, object]', value) if isinstance(value, dict) else {}
 
 
-def _message(update: object, chat_id: int) -> Message | None:
-    data = _mapping(update)
-    message = _mapping(data.get('message'))
-    chat = _mapping(message.get('chat'))
-    sender = _mapping(message.get('from'))
+def _build_message(update: object, chat_id: int) -> Message | None:
+    data = _as_mapping(update)
+    message_data = _as_mapping(data.get('message'))
+    chat = _as_mapping(message_data.get('chat'))
+    sender = _as_mapping(message_data.get('from'))
     if (
         type(chat.get('id')) is not int
         or chat.get('id') != chat_id
@@ -50,12 +50,12 @@ def _message(update: object, chat_id: int) -> Message | None:
         or type(sender.get('id')) is not int
         or sender.get('id') != chat_id
         or sender.get('is_bot') is not False
-        or 'via_bot' in message
+        or 'via_bot' in message_data
     ):
         return None
     update_id = data.get('update_id')
-    message_id, date = message.get('message_id'), message.get('date')
-    text = message.get('text')
+    message_id, date = message_data.get('message_id'), message_data.get('date')
+    text = message_data.get('text')
     if (
         type(update_id) is not int
         or type(message_id) is not int
@@ -70,11 +70,11 @@ def _message(update: object, chat_id: int) -> Message | None:
         message_id=message_id,
         date=date,
         text=text,
-        forwarded=any(key.startswith('forward_') for key in message),
+        forwarded=any(key.startswith('forward_') for key in message_data),
     )
 
 
-def _command_update(message: Message, chat_id: int) -> dict[str, object]:
+def _build_command_update(message: Message, chat_id: int) -> dict[str, object]:
     # Rebuild the update so names, quoted messages and other raw metadata never reach Hermes.
     return {
         'update_id': message['update_id'],
@@ -90,14 +90,14 @@ def _command_update(message: Message, chat_id: int) -> dict[str, object]:
 
 
 async def route_update(update: object, cfg: TelegramConfig, client: httpx.AsyncClient) -> None:
-    message = _message(update, cfg.chat_id)
+    message = _build_message(update, cfg.chat_id)
     if message is None:
         return
     if not message['forwarded'] and message['text'] in COMMANDS:
-        await _post(
+        await _post_json(
             client,
             cfg.hermes_webhook_url,
-            _command_update(message, cfg.chat_id),
+            _build_command_update(message, cfg.chat_id),
             {'X-Telegram-Bot-Api-Secret-Token': cfg.webhook_secret},
         )
         return
@@ -111,7 +111,7 @@ async def route_update(update: object, cfg: TelegramConfig, client: httpx.AsyncC
         log.warning('telegram dispatch failed, message dropped')
 
 
-async def _post(
+async def _post_json(
     client: httpx.AsyncClient,
     url: str,
     payload: dict[str, object],

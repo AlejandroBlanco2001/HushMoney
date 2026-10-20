@@ -22,14 +22,14 @@ class TelegramConfig:
     timeout_seconds: float
 
 
-def _required_secret(name: str) -> str:
+def _get_required_secret(name: str) -> str:
     value = os.environ.get(name, '').strip()
     if not value:
         raise ValueError(f'{name} is required')
     return value
 
 
-def _settings(path: Path) -> dict[str, object]:
+def _load_settings(path: Path) -> dict[str, object]:
     try:
         document: object = yaml.safe_load(path.read_text(encoding='utf-8'))
     except (OSError, yaml.YAMLError):
@@ -43,15 +43,15 @@ def _settings(path: Path) -> dict[str, object]:
     return cast('dict[str, object]', document)
 
 
-def _text(settings: dict[str, object], key: str) -> str:
+def _build_text(settings: dict[str, object], key: str) -> str:
     value = settings.get(key)
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f'forwarder.telegram.{key} must be a nonempty string')
     return value.strip()
 
 
-def _url(settings: dict[str, object], key: str) -> str:
-    value = _text(settings, key)
+def _build_url(settings: dict[str, object], key: str) -> str:
+    value = _build_text(settings, key)
     try:
         parsed = urlsplit(value)
         valid = (
@@ -73,11 +73,11 @@ def _url(settings: dict[str, object], key: str) -> str:
 
 
 def load(path: Path) -> TelegramConfig:
-    settings = _settings(path)
-    chat_id = _required_secret('TELEGRAM_CHAT_ID')
+    settings = _load_settings(path)
+    chat_id = _get_required_secret('TELEGRAM_CHAT_ID')
     if not re.fullmatch(r'[1-9][0-9]*', chat_id):
         raise ValueError('TELEGRAM_CHAT_ID must be a positive private chat ID')
-    secret = _required_secret('TELEGRAM_WEBHOOK_SECRET')
+    secret = _get_required_secret('TELEGRAM_WEBHOOK_SECRET')
     if not re.fullmatch(r'[A-Za-z0-9_-]{1,256}', secret):
         raise ValueError('TELEGRAM_WEBHOOK_SECRET must use Telegram secret-token characters')
     port = settings.get('port')
@@ -90,9 +90,9 @@ def load(path: Path) -> TelegramConfig:
         chat_id=int(chat_id),
         webhook_secret=secret,
         gateway_secret=os.environ.get('HERMES_GATEWAY_SECRET', '').strip(),
-        gateway_url=_url(settings, 'gateway_url'),
-        hermes_webhook_url=_url(settings, 'hermes_webhook_url'),
-        host=_text(settings, 'host'),
+        gateway_url=_build_url(settings, 'gateway_url'),
+        hermes_webhook_url=_build_url(settings, 'hermes_webhook_url'),
+        host=_build_text(settings, 'host'),
         port=port,
         timeout_seconds=float(cast('float', timeout)),
     )
