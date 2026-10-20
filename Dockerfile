@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install hermes-agent (manages its own runtime deps)
 RUN curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
 
-# Skills and config are mounted at runtime (see docker-compose.yml / fly.toml).
-# The hermes-agent installer sets up /init (s6-overlay PID 1) as the entrypoint.
-ENTRYPOINT ["/init", "/opt/hermes/docker/main-wrapper.sh"]
+ENV PATH="/root/.local/bin:$PATH"
+
+ENTRYPOINT ["hermes"]
 CMD ["gateway", "run"]
