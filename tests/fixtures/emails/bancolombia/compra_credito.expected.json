@@ -1,0 +1,9 @@
+{
+  "amount": 89900.00,
+  "currency": "COP",
+  "merchant": "NETFLIX",
+  "date": "2026-10-19T14:15:00Z",
+  "transaction_type": "debit",
+  "account_type": "credit",
+  "channel": "email"
+}
