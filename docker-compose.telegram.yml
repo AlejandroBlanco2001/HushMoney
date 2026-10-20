@@ -1,0 +1,23 @@
+# Use with docker-compose.yml. Route public HTTPS /telegram to localhost:9000.
+services:
+  hermes:
+    environment:
+      - TELEGRAM_WEBHOOK_URL=${TELEGRAM_WEBHOOK_URL:?Set the public HTTPS URL ending in /telegram}
+      - TELEGRAM_WEBHOOK_SECRET=${TELEGRAM_WEBHOOK_SECRET:?Set a shared Telegram webhook secret}
+      - TELEGRAM_WEBHOOK_PORT=8443
+
+  telegram-forwarder:
+    build:
+      context: ./forwarder
+    restart: unless-stopped
+    command: ["python", "-m", "forwarder.channels.telegram"]
+    volumes:
+      - ./config/hermes.yaml:/app/config/hermes.yaml:ro
+    environment:
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - TELEGRAM_WEBHOOK_SECRET=${TELEGRAM_WEBHOOK_SECRET:?Set a shared Telegram webhook secret}
+      - HERMES_GATEWAY_SECRET=${HERMES_GATEWAY_SECRET}
+    ports:
+      - "127.0.0.1:9000:9000"
+    depends_on:
+      - hermes

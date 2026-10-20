@@ -23,6 +23,14 @@ gateway:
 notifications:
   cash_operations_only: true
 
+forwarder:
+  telegram:
+    host: "0.0.0.0"
+    port: 9000
+    timeout_seconds: 15
+    gateway_url: "http://hermes:8080/gateway"
+    hermes_webhook_url: "http://hermes:8443/telegram"
+
 summaries:
   daily:
     enabled: true
