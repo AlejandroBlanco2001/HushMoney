@@ -79,6 +79,8 @@ hushmoney/
 
 Configuration and setup steps will be added as each component is built. Check `docs/architecture.md` for the full integration picture.
 
+For Telegram notification intake, see [Telegram setup and supported commands](docs/telegram.md).
+
 ## Security
 
 HushMoney is designed with a hard privacy boundary at the forwarder. Raw financial notifications — including OTPs, full account numbers, and recipient names — never reach the agent or the database. See `docs/rules/security.md` for the full policy.

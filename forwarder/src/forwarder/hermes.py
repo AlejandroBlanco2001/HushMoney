@@ -18,3 +18,15 @@ def dispatch(payload: CleanPayload, gateway_url: str, gateway_secret: str) -> No
     resp = httpx.post(gateway_url, json=payload.to_json(), headers=headers, timeout=15)
     resp.raise_for_status()
     log.info('dispatched to hermes')
+
+
+async def dispatch_async(
+    payload: CleanPayload,
+    gateway_url: str,
+    gateway_secret: str,
+    client: httpx.AsyncClient,
+) -> None:
+    headers = {'Authorization': f'Bearer {gateway_secret}'} if gateway_secret else {}
+    response = await client.post(gateway_url, json=payload.to_json(), headers=headers)
+    response.raise_for_status()
+    log.info('dispatched to hermes')

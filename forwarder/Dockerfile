@@ -4,8 +4,7 @@ RUN pip install uv --no-cache-dir
 
 WORKDIR /app
 COPY pyproject.toml .
-RUN uv pip install --system .
-
 COPY src/ src/
+RUN uv pip install --system .
 
 CMD ["python", "-m", "forwarder"]
