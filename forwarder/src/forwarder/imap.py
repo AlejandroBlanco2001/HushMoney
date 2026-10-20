@@ -55,7 +55,7 @@ def _fetch_from_sender(conn: imaplib.IMAP4_SSL, sender: str) -> list[Email]:
             continue
 
         results.append(Email(
-            from_=_decode_header(msg.get('From', '')),
+            from_=_resolve_original_sender(msg),
             subject=_decode_header(msg.get('Subject', '')),
             body=body.strip(),
         ))
@@ -63,6 +63,20 @@ def _fetch_from_sender(conn: imaplib.IMAP4_SSL, sender: str) -> list[Email]:
         conn.store(seq, '+FLAGS', '\\Seen')
 
     return results
+
+
+def _resolve_original_sender(msg: email.message.Message) -> str:
+    # Standard forwarding headers set by Outlook, Gmail, and most MTAs.
+    # Fall back to the envelope From if none are present (direct send, no forwarding).
+    for header in ('X-Original-From', 'X-Forwarded-From', 'Resent-From'):
+        value = msg.get(header, '')
+        if value:
+            resolved = _decode_header(value)
+            log.info('sender resolved via %s → %s', header, resolved)
+            return resolved
+    fallback = _decode_header(msg.get('From', ''))
+    log.info('sender resolved via From (no forwarding headers found) → %s', fallback)
+    return fallback
 
 
 def _extract_plain_text(msg: email.message.Message) -> str:
@@ -78,6 +92,19 @@ def _extract_plain_text(msg: email.message.Message) -> str:
             if isinstance(payload, bytes):
                 return payload.decode(msg.get_content_charset() or 'utf-8', errors='replace')
     return ''
+
+
+def parse_email_bytes(raw: bytes) -> Email | None:
+    """Parse a raw RFC 822 message. Returns None if no plain-text body found."""
+    msg = email.message_from_bytes(raw)
+    body = _extract_plain_text(msg)
+    if not body:
+        return None
+    return Email(
+        from_=_resolve_original_sender(msg),
+        subject=_decode_header(msg.get('Subject', '')),
+        body=body.strip(),
+    )
 
 
 def _decode_header(value: str) -> str:

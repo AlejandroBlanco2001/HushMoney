@@ -3,6 +3,12 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()  # no-op if .env not present; only active when python-dotenv is installed (dev)
+except ImportError:
+    pass
+
 
 @dataclass(frozen=True)
 class ImapConfig:
@@ -20,6 +26,7 @@ class Config:
     hermes_gateway_url: str
     hermes_gateway_secret: str
     poll_interval_seconds: int
+    dry_run: bool
 
 
 def _require(key: str) -> str:
@@ -47,7 +54,8 @@ def load() -> Config:
             mailbox=_optional('IMAP_MAILBOX', 'INBOX'),
             bank_senders=senders,
         ),
-        hermes_gateway_url=_require('HERMES_GATEWAY_URL'),
+        hermes_gateway_url=_optional('HERMES_GATEWAY_URL'),
         hermes_gateway_secret=_optional('HERMES_GATEWAY_SECRET'),
         poll_interval_seconds=int(_optional('POLL_INTERVAL_SECONDS', '300')),
+        dry_run=_optional('DRY_RUN', '').lower() in ('1', 'true', 'yes'),
     )

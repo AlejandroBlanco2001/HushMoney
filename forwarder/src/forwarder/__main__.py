@@ -21,6 +21,10 @@ def poll(cfg: config.Config) -> None:
         return
 
     for e in emails:
+        log.info('email | from=%s | subject=%s | body=%s', e.from_, e.subject, e.body)
+        if cfg.dry_run:
+            log.info('[dry-run] skipping hermes dispatch')
+            continue
         try:
             hermes.dispatch(e, cfg.hermes_gateway_url, cfg.hermes_gateway_secret)
         except Exception:
@@ -30,11 +34,12 @@ def poll(cfg: config.Config) -> None:
 def main() -> None:
     cfg = config.load()
     log.info(
-        'forwarder started host=%s mailbox=%s senders=%s interval=%ds',
+        'forwarder started host=%s mailbox=%s senders=%s interval=%ds dry_run=%s',
         cfg.imap.host,
         cfg.imap.mailbox,
         cfg.imap.bank_senders,
         cfg.poll_interval_seconds,
+        cfg.dry_run,
     )
 
     while True:
