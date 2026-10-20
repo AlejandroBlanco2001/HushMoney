@@ -4,7 +4,7 @@
 
 HushMoney intercepts financial notifications from email, SMS, and messaging apps, strips all sensitive details, and hands clean transaction signals to an AI agent that tracks, categorizes, and summarizes your spending — automatically.
 
-## How It Works
+## How It Work
 
 ```
 Bank email / SMS / Telegram
