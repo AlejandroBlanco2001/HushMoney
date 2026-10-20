@@ -22,7 +22,7 @@ def poll(cfg: config.Config) -> None:
         return
 
     for e in emails:
-        payload = sanitize(e.body, channel='email')
+        payload = sanitize(e.body, channel='email', sender=e.from_)
         if payload is None:
             log.info('pattern not matched, email dropped')
             continue

@@ -3,19 +3,25 @@ from __future__ import annotations
 import dataclasses
 import re
 
-from forwarder.sanitizer import bancolombia
+from forwarder.sanitizer import parser
 from forwarder.sanitizer.models import Channel, CleanPayload
 from forwarder.sanitizer.redaction import REDACTED, redact
+from forwarder.sanitizer.selector import BankSelector
 
 
 __all__ = ['CleanPayload', 'sanitize']
 
+_BANK_SELECTOR = BankSelector()
 _SUSPICIOUS_MERCHANT = re.compile(r'\d{4,}|@|https?:', re.IGNORECASE)
 
 
-def sanitize(text: str, channel: Channel) -> CleanPayload | None:
+def sanitize(text: str, channel: Channel, *, sender: str | None = None) -> CleanPayload | None:
     """Return a clean payload, or None when no known bank pattern matches."""
-    payload = bancolombia.parse(redact(text), channel)
+    clean_text = redact(text)
+    bank = _BANK_SELECTOR.select_bank(clean_text, sender)
+    if bank is None:
+        return None
+    payload = parser.parse(clean_text, channel, bank)
     if payload is None or payload.merchant is None:
         return payload
     return dataclasses.replace(payload, merchant=_normalize_merchant(payload.merchant))
