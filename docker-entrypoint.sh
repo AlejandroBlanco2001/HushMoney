@@ -9,9 +9,27 @@ fi
 # Write hermes model config — model goes in config.yaml; .env is for secrets only
 mkdir -p /root/.hermes
 cat > /root/.hermes/config.yaml << 'EOF'
-model: nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B
-provider: openai
-base_url: https://api.studio.nebius.ai/v1/
+model:
+  default: nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B
+  provider: openai
+  base_url: https://api.studio.nebius.ai/v1/
+agent:
+  reasoning_effort: low
+platform_toolsets:
+  telegram:
+    - clarify
+    - cronjob
+    - file
+    - skills
+    - terminal
+    - todo
+  cli:
+    - clarify
+    - cronjob
+    - file
+    - skills
+    - terminal
+    - todo
 EOF
 
 # Start Telegram gateway in background
