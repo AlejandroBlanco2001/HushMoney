@@ -69,9 +69,8 @@ The forwarder has one job that must never silently fail: stripping sensitive dat
 | Module | Test? | Why |
 |---|---|---|
 | `sanitizer/` | **Yes — always** | Privacy boundary; a miss leaks PII to Hermes |
-| `dispatcher/` | **Yes** | Schema mismatch silently corrupts Hermes input |
-| `channels/email.py` | Light integration test with a recorded payload | Adapter logic, not complex |
+| `hermes.py` | **Yes** | Schema mismatch silently corrupts Hermes input |
+| `imap.py` | Light integration test with a recorded payload | Adapter logic, not complex |
 | `channels/telegram.py` | Light integration test with a recorded update | Same |
-| `/confirm` endpoint | **Yes** | Used during setup to relay Gmail confirmation code; must be reliable |
 
 Use `hypothesis` for sanitizer fuzz testing — generate arbitrary strings and assert no sensitive patterns survive. A regex that passes all hand-written examples but fails on a real bank message format is a real risk.

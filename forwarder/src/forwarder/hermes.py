@@ -26,7 +26,9 @@ async def dispatch_async(
     gateway_secret: str,
     client: httpx.AsyncClient,
 ) -> None:
-    headers = {'Authorization': f'Bearer {gateway_secret}'} if gateway_secret else {}
+    headers: dict[str, str] = {'Content-Type': 'application/json'}
+    if gateway_secret:
+        headers['Authorization'] = f'Bearer {gateway_secret}'
     response = await client.post(gateway_url, json=payload.to_json(), headers=headers)
     response.raise_for_status()
     log.info('dispatched to hermes')

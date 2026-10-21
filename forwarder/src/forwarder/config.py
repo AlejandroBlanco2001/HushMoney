@@ -26,7 +26,7 @@ class Config:
     hermes_gateway_url: str
     hermes_gateway_secret: str
     poll_interval_seconds: int
-    dry_run: bool
+    dry_run: bool  # TODO: skip hermes.dispatch and log the payload instead
 
 
 def _require(key: str) -> str:

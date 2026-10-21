@@ -12,7 +12,7 @@ from forwarder.config import ImapConfig
 log = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class Email:
     from_: str
     subject: str
@@ -20,7 +20,6 @@ class Email:
 
 
 def fetch_unread(cfg: ImapConfig) -> list[Email]:
-    """Connect, collect unseen emails from each bank sender, mark them seen."""
     with imaplib.IMAP4_SSL(cfg.host, cfg.port) as conn:
         conn.login(cfg.username, cfg.password)
         conn.select(cfg.mailbox)
@@ -60,6 +59,8 @@ def _fetch_from_sender(conn: imaplib.IMAP4_SSL, sender: str) -> list[Email]:
             body=body.strip(),
         ))
 
+        # Mark seen before returning — no retry queue by design; dropped messages are
+        # preferable to re-processing and double-counting a transaction.
         conn.store(seq, '+FLAGS', '\\Seen')
 
     return results
@@ -95,7 +96,6 @@ def _extract_plain_text(msg: email.message.Message) -> str:
 
 
 def parse_email_bytes(raw: bytes) -> Email | None:
-    """Parse a raw RFC 822 message. Returns None if no plain-text body found."""
     msg = email.message_from_bytes(raw)
     body = _extract_plain_text(msg)
     if not body:

@@ -10,7 +10,7 @@ import pytest
 from starlette.testclient import TestClient
 
 from forwarder.channels.telegram import COMMANDS, MAX_BODY_BYTES, create_app
-from forwarder.channels.telegram_config import TelegramConfig
+from forwarder.channels.telegram import TelegramConfig
 
 
 FIXTURES = Path(__file__).resolve().parents[2] / 'tests' / 'fixtures'

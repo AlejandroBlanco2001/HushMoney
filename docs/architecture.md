@@ -228,7 +228,7 @@ config/
 
 1. Bank sends email to the user's Gmail: `"Compra por $45,000 en RAPPI. Tarjeta terminada 1234."`
 2. Forwarder IMAP poller fetches it (polls every 5 min, searches UNSEEN from bank sender)
-3. Forwarder POSTs `{channel, from, subject, body}` to `gateway_server.py` on port 8080
+3. Forwarder sanitizes the email body and POSTs a `CleanPayload` to `gateway_server.py` on port 8080
 4. `gateway_server.py` invokes `hermes send` to deliver the message to the user's Telegram chat
 5. Hermes runs `expense_tracker` → stores in SQLite
 6. Hermes runs `categorizer` → tags as `food`

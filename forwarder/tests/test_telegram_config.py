@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from forwarder.channels.telegram_config import load
+from forwarder.channels.telegram import load
 
 
 CONFIG = Path(__file__).resolve().parents[2] / 'config/hermes.yaml'

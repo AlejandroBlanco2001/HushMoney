@@ -16,7 +16,6 @@ _SUSPICIOUS_MERCHANT = re.compile(r'\d{4,}|@|https?:', re.IGNORECASE)
 
 
 def sanitize(text: str, channel: Channel, *, sender: str | None = None) -> CleanPayload | None:
-    """Return a clean payload, or None when no known bank pattern matches."""
     clean_text = redact(text)
     bank = _BANK_SELECTOR.select_bank(clean_text, sender)
     if bank is None:
