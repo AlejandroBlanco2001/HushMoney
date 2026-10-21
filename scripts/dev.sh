@@ -161,23 +161,22 @@ else
     info "Nebius provider already registered."
 fi
 
-# Step 4: (Re)create sandbox from our Dockerfile
-# Secrets are uploaded via .env; policy is applied inline at create time.
+# Step 4: Create sandbox — reuse if already running to skip the image build.
 if sandbox_exists; then
-    info "Removing existing sandbox..."
-    openshell sandbox delete "$SANDBOX_NAME" 2>/dev/null || true
+    info "Sandbox $SANDBOX_NAME already exists — reusing it."
+    SANDBOX_PID=""
+else
+    info "Creating sandbox $SANDBOX_NAME (first run — builds image, may take a few minutes)..."
+    openshell sandbox create \
+        --from "$REPO_ROOT" \
+        --name "$SANDBOX_NAME" \
+        --policy "$REPO_ROOT/config/openshell/policy.yaml" \
+        --provider nebius \
+        --upload "$ENV_FILE":/app/.env \
+        -- /app/docker-entrypoint.sh &
+    SANDBOX_PID=$!
+    info "Hermes sandbox started (PID $SANDBOX_PID)."
 fi
-
-info "Creating sandbox $SANDBOX_NAME..."
-openshell sandbox create \
-    --from ghcr.io/alejandroblanco2001/untyped:latest \
-    --name "$SANDBOX_NAME" \
-    --policy "$REPO_ROOT/config/openshell/policy.yaml" \
-    --provider nebius \
-    --upload "$ENV_FILE":/app/.env \
-    -- /app/docker-entrypoint.sh &
-SANDBOX_PID=$!
-info "Hermes sandbox started (PID $SANDBOX_PID)."
 
 # Step 5: Start forwarder via podman compose (runs outside the sandbox)
 # --no-deps skips starting the hermes compose service — Hermes already runs
