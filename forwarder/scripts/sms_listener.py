@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from pyrogram import Client
 from pyrogram.types import Message
 
-load_dotenv(Path(__file__).parent.parent / ".env")
+load_dotenv(Path(__file__).parents[2] / ".env")
 
 API_ID       = int(os.environ["TELEGRAM_API_ID"])
 API_HASH     = os.environ["TELEGRAM_API_HASH"]

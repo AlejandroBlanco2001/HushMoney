@@ -51,7 +51,7 @@ def handler():
 
         spec = importlib.util.spec_from_file_location(
             "sms_listener",
-            pathlib.Path(__file__).parents[2] / "scripts" / "sms_listener.py",
+            pathlib.Path(__file__).parents[1] / "scripts" / "sms_listener.py",
         )
         mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
         spec.loader.exec_module(mod)  # type: ignore[union-attr]
