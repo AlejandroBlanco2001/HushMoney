@@ -168,9 +168,9 @@ if sandbox_exists; then
     openshell sandbox delete "$SANDBOX_NAME" 2>/dev/null || true
 fi
 
-info "Creating sandbox $SANDBOX_NAME (builds image — may take a minute)..."
+info "Creating sandbox $SANDBOX_NAME..."
 openshell sandbox create \
-    --from "$REPO_ROOT" \
+    --from ghcr.io/alejandroblanco2001/untyped:latest \
     --name "$SANDBOX_NAME" \
     --policy "$REPO_ROOT/config/openshell/policy.yaml" \
     --provider nebius \
@@ -180,8 +180,10 @@ SANDBOX_PID=$!
 info "Hermes sandbox started (PID $SANDBOX_PID)."
 
 # Step 5: Start forwarder via podman compose (runs outside the sandbox)
+# --no-deps skips starting the hermes compose service — Hermes already runs
+# inside the OpenShell sandbox on port 8080.
 info "Starting forwarder..."
-HERMES_UID=$(id -u) HERMES_GID=$(id -g) podman compose up -d forwarder
+HERMES_UID=$(id -u) HERMES_GID=$(id -g) podman compose up -d --no-deps forwarder
 
 # ── Done ───────────────────────────────────────────────────────────────────────
 
