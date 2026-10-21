@@ -10,17 +10,18 @@ HushMoney is a **single-user, self-hosted deployment**. One instance runs on EC2
 ┌─────────────────────────────────────────────────────────────────┐
 │                         Input Sources                           │
 │                                                                 │
-│   Bank email notification          Bank SMS / Telegram message  │
+│  Bank email notification       Bank SMS (received on iPhone)    │
 │          │                                    │                 │
 │          ▼                                    ▼                 │
-│   Gmail inbox (bank sets up        User forwards to their       │
-│   email alerts to Gmail)           private @TheirOwnBot         │
+│   Gmail inbox (bank sets       iPhone Shortcut fires:           │
+│   up email alerts to Gmail)    sends SMS text to Saved Messages │
 └────────────┬──────────────────────────────────┬─────────────────┘
              │                                  │
              ▼                                  ▼
-   IMAP Poller (polls Gmail              Telegram Bot API
-   every 5 min for unseen               (long-poll or webhook)
-   emails from bank senders)
+   IMAP Poller (polls Gmail         Pyrogram listener
+   every 5 min for unseen           (scripts/sms_listener.py)
+   emails from bank senders)        watches Saved Messages via
+                                    MTProto, forwards text to bot
              │                                  │
              └──────────────┬───────────────────┘
                             │
@@ -77,11 +78,13 @@ Supports auto-forwarded emails: if the email contains `X-Original-From` or `X-Fo
 
 No domain, no webhook, no third-party routing service required.
 
-### Telegram Bot (user-owned)
+### Telegram (two roles)
 
-The user creates their own bot via @BotFather and stores the token in `.env`. The forwarder's Telegram adapter listens for updates on that bot (long-polling or webhook). Only the user's own chat ID can send messages — no public exposure.
+**Bot (output + commands):** The user creates a bot via @BotFather and stores the token in `.env`. Hermes uses this bot to send reminders, summaries, and interactive prompts. The forwarder's `channels/telegram.py` receives webhook updates for any direct commands the user sends.
 
-The same bot is used for **input** (user forwards bank notifications to it) and **output** (Hermes sends reminders and summaries back through it). Hermes's built-in Telegram gateway handles the output side; the forwarder handles the input side.
+**MTProto user client (SMS input):** `scripts/sms_listener.py` runs a Pyrogram session logged in as the user. It watches Saved Messages (the user's self-chat) for incoming text and forwards it to the bot as a real user message. This is the SMS intake path — iPhone Shortcuts writes to Saved Messages; the listener picks it up.
+
+The session string is generated once by `dev.sh` on first run and stored in `.env`. No session file is needed at runtime.
 
 ### Forwarder (`forwarder/`)
 
@@ -230,15 +233,22 @@ config/
 5. Hermes runs `expense_tracker` → stores in SQLite
 6. Hermes runs `categorizer` → tags as `food`
 
+## Data Flow: SMS (iPhone)
+
+1. Bank sends SMS to the user's iPhone
+2. iPhone Shortcut fires: sends the SMS body to **Saved Messages** (self-chat)
+3. Pyrogram listener (`scripts/sms_listener.py`) detects the new message
+4. Listener sends the text to the bot as a real user message, leaving the original intact
+5. Forwarder Telegram adapter receives the message → sanitizer strips account suffix → emits `CleanPayload`
+6. Hermes stores and categorizes the transaction
+
 ## Data Flow: Cash Operation
 
-1. User's bank sends SMS: `"ATM cash withdrawal USD 100.00 — Account ending 1234"`
-2. User forwards the SMS to their Telegram bot (or Android auto-forward app does it)
-3. Forwarder Telegram adapter receives the forwarded message
-4. Sanitizer strips account suffix → emits clean payload with `transaction_type: cash`
-5. Hermes stores the transaction, then sends Telegram reminder:
+1. Bank SMS arrives via the iPhone flow above
+2. Sanitizer emits clean payload with `transaction_type: cash`
+3. Hermes stores the transaction, then sends Telegram reminder:
    `"Cash withdrawal of $100 detected. Add a description? (e.g., groceries, taxi)"`
-6. User replies optionally; Hermes updates the record
+4. User replies optionally; Hermes updates the record
 
 ## Data Flow: Debt Tracking
 

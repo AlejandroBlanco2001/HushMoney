@@ -6,9 +6,26 @@ This guide is for team members who will use an AI coding assistant (Cursor, Open
 
 - [Cursor](https://cursor.sh) or [OpenCode](https://opencode.ai) — your AI-powered editor
 - [Git](https://git-scm.com/downloads) — to save and share your changes
+- [uv](https://docs.astral.sh/uv/) — Python package runner (used by `dev.sh`)
+- [Podman](https://podman.io/) — container runtime
 - Python 3.12 — only needed if you want to run the forwarder locally
 
 You do not need to know how to code. The AI assistant will write the code; your job is to describe what you want clearly and review what it produces.
+
+## First-Time Setup
+
+1. Copy `.env.example` to `.env` and fill in your credentials:
+   - `TELEGRAM_BOT_TOKEN` — from [@BotFather](https://t.me/BotFather)
+   - `TELEGRAM_BOT_ID` — the number before the `:` in your bot token
+   - `TELEGRAM_CHAT_ID` — your personal Telegram user ID (ask [@userinfobot](https://t.me/userinfobot))
+   - `BOT_USERNAME` — your bot's `@handle`
+   - `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` — from [my.telegram.org](https://my.telegram.org)
+   - `NEBIUS_API_KEY`, `IMAP_*`, `BANK_SENDER_EMAILS` — see comments in `.env.example`
+
+2. Run `./scripts/dev.sh`. On first run it will:
+   - Detect that `TELEGRAM_SESSION_STRING` is missing
+   - Prompt you for your Telegram phone number and a one-time OTP
+   - Save the session string to `.env` automatically — you never need to do this again
 
 ## How This Repo Is Organized
 
