@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """Watch Saved Messages, forward each message to the bot as a real user message, then delete it."""
 import os
-from pathlib import Path
 
 from dotenv import load_dotenv
 from pyrogram import Client
 from pyrogram.types import Message
 
-load_dotenv(Path(__file__).parents[2] / ".env")
+load_dotenv()
 
 API_ID       = int(os.environ["TELEGRAM_API_ID"])
 API_HASH     = os.environ["TELEGRAM_API_HASH"]
