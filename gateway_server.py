@@ -21,7 +21,7 @@ HERMES_BIN = "/root/.local/bin/hermes"
 
 _NEBIUS_URL = (os.getenv("OPENAI_BASE_URL", "https://api.studio.nebius.ai/v1/").rstrip("/")
                + "/chat/completions")
-_NEBIUS_MODEL = os.getenv("HERMES_MODEL", "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B")
+_NEBIUS_MODEL = os.getenv("HERMES_MODEL", "nvidia/nemotron-3-super-120b-a12b")
 _KEEPALIVE_INTERVAL = int(os.getenv("NEBIUS_KEEPALIVE_INTERVAL", "240"))
 
 

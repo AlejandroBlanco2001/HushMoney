@@ -24,6 +24,7 @@ services:
       - ./config/hermes.yaml:/opt/data/hermes.yaml:ro
       - ./config/hermes.yaml:/app/hermes.yaml:ro
       - ./config/schema.sql:/app/config/schema.sql:ro
+      - ./config/SOUL.md:/app/SOUL.md:ro
     environment:
       - HERMES_UID=${HERMES_UID:-1000}
       - HERMES_GID=${HERMES_GID:-1000}

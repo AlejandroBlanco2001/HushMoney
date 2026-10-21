@@ -27,7 +27,8 @@ class BankPatterns:
     decimal_separator: str = ','
 
 
-_AMOUNT = r'\$(?P<amount>\d{1,3}(?:\.\d{3})*,\d{2})'
+# Accepts both Colombian ($6.930,00) and US ($1,000.00) number formats.
+_AMOUNT = r'\$(?P<amount>\d{1,3}(?:[.,]\d{3})*[.,]\d{2})'
 BANCOLOMBIA = BankPatterns(
     name='bancolombia',
     email_senders=frozenset(

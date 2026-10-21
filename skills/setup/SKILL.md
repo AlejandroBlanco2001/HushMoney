@@ -1,7 +1,7 @@
 ---
 name: setup
 description: One-time guided onboarding via Telegram
-version: 0.2.0
+version: 0.3.0
 author: hushmoney
 metadata:
   hermes:
@@ -23,7 +23,7 @@ The user can restart by sending `/reset-setup`.
 
 ### Step 0 — Init and guard
 
-1. Run: `python3 skills/setup/scripts/seed_defaults.py`
+1. Run: `python3 /root/.hermes/skills/hushmoney/setup/scripts/seed_defaults.py`
 2. Parse the JSON output. If `setup_complete` is `"true"`:
    - Reply: "You're already set up! Send me a transaction or ask for a summary."
    - Stop.
@@ -34,14 +34,23 @@ The user can restart by sending `/reset-setup`.
 
 ### Step 1 — Welcome
 
-Send the contents of `skills/setup/templates/welcome.md` verbatim.
-Wait for the user to reply with any message before proceeding.
+Send the contents of `skills/setup/templates/welcome.md` verbatim, then add:
+
+> How would you like to get started?
+>
+> 1. Full setup — configure email + accounts + SMS
+> 2. Accounts only — skip email, just register your accounts
+>
+> Reply 1 or 2.
+
+- If the user replies **2**: skip directly to Step 3 (Accounts).
+- Otherwise: continue to Step 2.
 
 ---
 
 ### Step 2 — Email channel
 
-Save progress: `python3 skills/setup/scripts/save_setting.py setup_step email_provider`
+Save progress: `python3 /root/.hermes/skills/hushmoney/setup/scripts/save_setting.py setup_step email_provider`
 
 Ask the user (send exactly this, as a numbered list):
 
@@ -87,7 +96,7 @@ Ask: "What is your password or App Password?"
 
 #### Step 2c — Bank sender emails
 
-Save progress: `python3 skills/setup/scripts/save_setting.py setup_step email_senders`
+Save progress: `python3 /root/.hermes/skills/hushmoney/setup/scripts/save_setting.py setup_step email_senders`
 
 Ask:
 > What are the sender addresses your bank uses for email notifications?
@@ -101,7 +110,7 @@ Ask:
 
 Run:
 ```
-python3 skills/setup/scripts/check_imap.py \
+python3 /root/.hermes/skills/hushmoney/setup/scripts/check_imap.py \
   --host [host] --port [port] \
   --username [username] --password [password] \
   --senders "[comma-separated senders]"
@@ -109,16 +118,15 @@ python3 skills/setup/scripts/check_imap.py \
 
 Parse JSON output:
 - `success: true` → tell user: "✅ Connected successfully! I can see your inbox."
-  - If `unseen_from_bank > 0`: "I can already see [N] unread bank emails. I'll process them now."
-- `success: false, error: "auth"` → "❌ Login failed. Double-check your App Password is correct and IMAP is enabled."
-  Offer to retry (go back to password question, max 3 attempts then abort).
-- `success: false, error: "connection"` → "❌ Could not reach [host]. Check the hostname and try again."
-- `success: false, error: "sender_not_found"` → "⚠️ Connected, but I didn't find any emails from those senders in your inbox.
-  That's OK — I'll start capturing them as they arrive. If you want, forward yourself a recent bank email to test."
+  - If `unseen_from_bank > 0`: "I can already see [N] unread bank emails."
+- `success: false, error: "auth"` → "❌ Login failed. Check your App Password and try again."
+  Offer to retry (max 3 attempts then abort).
+- `success: false, error: "connection"` → "❌ Could not reach [host]. Check the hostname."
+- `success: false, error: "sender_not_found"` → "⚠️ Connected, but no emails from those senders yet. I'll capture them as they arrive."
 
 On success, run:
 ```
-python3 skills/setup/scripts/save_email_config.py \
+python3 /root/.hermes/skills/hushmoney/setup/scripts/save_email_config.py \
   --provider [gmail|yahoo|outlook_forward|other] \
   --host [host] --port [port] \
   --username [username] \
@@ -126,21 +134,17 @@ python3 skills/setup/scripts/save_email_config.py \
 ```
 
 Then tell the user:
-> ✅ Email channel is configured. Add these values to your `.env` file:
-> ```
-> IMAP_HOST=[host]
-> IMAP_PORT=[port]
-> IMAP_USERNAME=[username]
-> IMAP_PASSWORD=<the App Password you entered>
-> BANK_SENDER_EMAILS=[senders]
-> ```
-> Then run `./scripts/setup.sh` to apply.
+> ✅ Email channel configured. I've saved your settings and will start watching
+> [username] for emails from your bank.
+
+Do NOT tell the user to run any commands or edit any files. The configuration
+is already saved internally.
 
 ---
 
 ### Step 3 — Accounts
 
-Save progress: `python3 skills/setup/scripts/save_setting.py setup_step accounts`
+Save progress: `python3 /root/.hermes/skills/hushmoney/setup/scripts/save_setting.py setup_step accounts`
 
 Tell the user:
 > Now let's map your bank accounts. I'll use this to match transaction notifications
@@ -161,52 +165,68 @@ the bank name and use it lowercased with no spaces as the slug.
 For **each selected bank**, ask:
 > What types of accounts do you have with [Bank]? (Reply with numbers, comma-separated)
 >
-> 1. Checking / Savings account (cuenta de ahorros / corriente)
+> 1. Checking / Savings (cuenta de ahorros / corriente)
 > 2. Credit card
 > 3. Digital wallet (Nequi, Daviplata, etc.)
 
 Map to type values: `1` → `checking`, `2` → `credit`, `3` → `digital_wallet`.
 
-For **each account**, ask:
-> What are the last 4 digits shown in [Bank] notifications for this account?
-> (These appear as `****1234` in SMS or email alerts — type "skip" to leave blank)
+For **each account**, collect the following — ask each question separately, one at a time:
 
-Then ask:
+**Question A — Account number (last 4)**
+> What are the last 4 digits of the account number shown in [Bank] notifications?
+> (e.g. if transfers show "Cta ****1234", type 1234 — type "skip" to leave blank)
+
+Store as `masked_account`.
+
+**Question B — Card number (last 4), only for `checking` and `credit` types**
+> What are the last 4 digits of the card linked to this account?
+> (e.g. if purchases show "Tarjeta ****5678", type 5678 — type "skip" to leave blank)
+>
+> Note: these are usually different from the account digits above. Both are
+> needed to match purchases (card) vs. transfers (account).
+
+Store as `masked_card`.
+
+**Question C — Currency**
 > What currency is this account in? (Press Enter for COP)
 >
 > Common options: COP, USD, EUR
 
 Use the user's answer uppercased, defaulting to `COP` if blank.
 
-Then ask:
+**Question D — Nickname**
 > Give this account a nickname so I can refer to it in summaries.
 > (e.g. "Bancolombia débito", "Visa gold", or press Enter to skip)
 
 For each account, run:
 ```
-python3 skills/setup/scripts/save_accounts.py \
+python3 /root/.hermes/skills/hushmoney/setup/scripts/save_accounts.py \
   --bank <slug> \
   --type <type> \
   --currency <currency> \
   [--masked-number "****XXXX"] \
+  [--card-masked-number "****YYYY"] \
   [--alias "<nickname>"]
 ```
 
-Omit `--masked-number` if the user skipped it. Omit `--alias` if blank.
+- Use `--masked-number` for the account number (Question A). Omit if skipped.
+- Use `--card-masked-number` for the card number (Question B). Omit if skipped.
+- Omit `--alias` if blank.
 
 After all accounts are saved, run:
 ```
-python3 skills/setup/scripts/save_setting.py accounts_configured true
+python3 /root/.hermes/skills/hushmoney/setup/scripts/save_setting.py accounts_configured true
 ```
 
-Tell the user how many accounts were saved:
+Tell the user:
 > ✅ Saved [N] account(s). I'll automatically match incoming transactions to these.
 
 ---
 
 ### Step 4 — SMS channel
 
-Save progress: `python3 skills/setup/scripts/save_setting.py setup_step sms`
+Save progress: `python3 /root/.hermes/skills/hushmoney/setup/scripts/save_setting.py setup_step sms`
 
 Ask:
 > Would you also like to set up SMS forwarding? This lets me capture bank
@@ -215,7 +235,7 @@ Ask:
 > 1. Yes — set it up now
 > 2. Skip — I'll do this later
 
-If skip → go to Step 4.
+If skip → go to Step 5.
 
 Ask: "What phone do you use?"
 > 1. iPhone
@@ -225,10 +245,8 @@ Ask: "What phone do you use?"
 #### iPhone
 
 Send `skills/setup/templates/sms_iphone.md`.
-After sending, ask: "Reply when you've set up the Shortcut and I'll confirm it's
-working by asking you to trigger it."
-Wait for confirmation, then say: "Great — if you triggered the Shortcut and I
-received a message, SMS forwarding is active."
+After sending, ask: "Reply when you've set up the Shortcut and I'll confirm it's working."
+Wait for confirmation, then say: "Great — SMS forwarding is active."
 
 #### Android
 
@@ -238,7 +256,7 @@ Send `skills/setup/templates/sms_android.md`.
 
 ### Step 5 — Complete
 
-Run: `python3 skills/setup/scripts/mark_setup_complete.py`
+Run: `python3 /root/.hermes/skills/hushmoney/setup/scripts/mark_setup_complete.py`
 
 Send:
 > 🎉 Setup complete! Here's what's active:
@@ -253,28 +271,26 @@ Send:
 
 ## Pitfalls
 
+- **Never tell the user to run shell commands or edit config files.** All
+  configuration is saved internally. The user never needs to touch `.env`,
+  run scripts, or restart services.
+- **Ask each question ONCE.** Do not send the same question twice. Use a
+  single message per question — never repeat if the model already sent it.
 - **Never log or repeat passwords.** The IMAP password is used once for
-  `check_imap.py` and `save_email_config.py` does NOT store it. If Hermes
-  needs to test again, ask the user to re-enter it.
-- **Outlook IMAP is disabled by default** and requires an Azure AD app to
-  enable — far too complex for this setup. Always redirect Outlook users to
-  set up a forwarding rule to Gmail or Yahoo. Do not suggest enabling
-  Outlook IMAP directly.
-- **Manual forwarding breaks sender detection.** When a user manually clicks
-  "Forward" in their email client, the original bank sender headers are
-  lost and the forwarder sees the user's own address. Only server-side
-  forwarding rules (Outlook rules, Gmail filters) preserve the headers.
-  Make this clear if the user asks.
-- **iPhone Shortcuts "Send Message" action sends iMessage**, not Telegram.
-  The correct action is "Get Contents of URL" calling the Telegram Bot API.
-  See `sms_iphone.md` for the exact configuration.
+  `check_imap.py` and not stored.
+- **Checking/savings accounts have two separate masked numbers**: the account
+  number (used for transfers) and the card number (used for purchases). Both
+  are needed to match all transaction types. Always ask for both for `checking`
+  and `credit` types.
+- **Outlook IMAP is disabled by default.** Always redirect Outlook users to
+  set up a forwarding rule to Gmail or Yahoo.
+- **iPhone Shortcuts "Send Message" sends iMessage**, not Telegram. The correct
+  action is "Get Contents of URL" calling the Telegram Bot API.
 
 ## Verification
 
 After setup:
 - `user_settings.setup_complete == "true"`
-- `user_settings.email_provider` is set
-- `user_settings.imap_username` is set
-- `user_settings.bank_sender_emails` is set
+- `user_settings.email_provider` is set (unless user chose accounts-only)
 - `user_settings.accounts_configured == "true"`
 - At least one row exists in the `accounts` table

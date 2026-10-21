@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 
 
 DB_PATH = os.environ.get('HUSHMONEY_DB', os.path.expanduser('~/.hermes/hushmoney.db'))
+_SCHEMA_PATH = os.environ.get('HUSHMONEY_SCHEMA', '/app/config/schema.sql')
 
 DEFAULTS: dict[str, str] = {
     'setup_complete':      'false',
@@ -28,9 +29,16 @@ DEFAULTS: dict[str, str] = {
 }
 
 
+def _ensure_schema(con: sqlite3.Connection) -> None:
+    schema_path = os.path.abspath(_SCHEMA_PATH)
+    if os.path.isfile(schema_path):
+        con.executescript(open(schema_path).read())
+
+
 def main() -> None:
     con = sqlite3.connect(DB_PATH)
     con.row_factory = sqlite3.Row
+    _ensure_schema(con)
     now = datetime.now(UTC).isoformat()
 
     with con:
