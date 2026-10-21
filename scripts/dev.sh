@@ -17,9 +17,6 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="$REPO_ROOT/.env"
 SANDBOX_NAME="hushmoney-1"
-PROFILE_NAME="hushmoney"
-POLICY_NAME="hushmoney"
-GATEWAY_TOML="$HOME/.config/openshell/gateway.toml"
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -51,20 +48,16 @@ load_env() {
     set -a; source "$ENV_FILE"; set +a
 }
 
-openshell_secret_set() {
-    local name="$1" value="$2"
-    # set is idempotent — creates or updates
-    openshell secret set "$name" "$value" 2>/dev/null || \
-        warn "Could not set secret $name — check openshell status"
+sandbox_setting_set() {
+    local sandbox="$1" key="$2" value="$3"
+    openshell settings set "$sandbox" --key "$key" --value "$value" 2>/dev/null || \
+        warn "Could not set setting $key on sandbox $sandbox"
 }
 
 sandbox_exists() {
     openshell sandbox list 2>/dev/null | grep -q "$SANDBOX_NAME"
 }
 
-sandbox_running() {
-    openshell sandbox list 2>/dev/null | grep "$SANDBOX_NAME" | grep -q "running"
-}
 
 # ── Down ───────────────────────────────────────────────────────────────────────
 
@@ -74,7 +67,6 @@ if [[ "$MODE" == down ]]; then
 
     if command -v openshell &>/dev/null && sandbox_exists; then
         info "Stopping OpenShell sandbox..."
-        openshell sandbox stop "$SANDBOX_NAME" 2>/dev/null || true
         openshell sandbox delete "$SANDBOX_NAME" 2>/dev/null || true
     fi
 
@@ -87,7 +79,7 @@ fi
 if [[ "$MODE" == logs ]]; then
     if command -v openshell &>/dev/null && sandbox_exists; then
         info "Hermes sandbox logs (ctrl-c to exit):"
-        openshell sandbox logs "$SANDBOX_NAME" --follow &
+        openshell logs "$SANDBOX_NAME" --tail &
         HERMES_LOG_PID=$!
     else
         info "Hermes container logs (ctrl-c to exit):"
@@ -135,63 +127,49 @@ if ! command -v openshell &>/dev/null; then
     export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"
 fi
 
-openshell status &>/dev/null || error "OpenShell gateway is not running. Try: systemctl --user start openshell"
+# Rootful Podman socket — required for OpenShell (k3s kubelet needs /dev/kmsg,
+# which is blocked in rootless user-namespace containers on NixOS)
+export DOCKER_HOST="unix:///run/podman/podman.sock"
 
-# Step 2: Gateway config
-if [[ ! -f "$GATEWAY_TOML" ]]; then
-    info "Installing OpenShell gateway config..."
-    mkdir -p "$(dirname "$GATEWAY_TOML")"
-    cp "$REPO_ROOT/config/openshell/gateway.toml" "$GATEWAY_TOML"
-    openshell-gateway config preflight --path "$GATEWAY_TOML" || \
-        warn "Config preflight failed — gateway may need a restart: systemctl --user restart openshell"
+# Step 2: Ensure gateway is running (auto-starts if needed)
+# openshell status exits 0 even with no active gateway; provider list requires one
+if ! openshell provider list &>/dev/null; then
+    info "Starting OpenShell gateway..."
+    openshell gateway start
 fi
 
 # Step 3: Register Nebius inference provider (idempotent)
 if ! openshell provider list 2>/dev/null | grep -q "nebius"; then
     info "Registering Nebius inference provider..."
     [[ -z "${NEBIUS_API_KEY:-}" ]] && error "NEBIUS_API_KEY not set in .env"
-    openshell provider create nebius \
-        --endpoint https://api.studio.nebius.ai/v1/ \
-        --api-key "$NEBIUS_API_KEY"
+    openshell provider create \
+        --name nebius \
+        --type openai \
+        --credential "NEBIUS_API_KEY=$NEBIUS_API_KEY" \
+        --config "base_url=https://api.studio.nebius.ai/v1/"
 else
     info "Nebius provider already registered."
 fi
 
-# Step 4: Push secrets into OpenShell (replaces writing them to .env on the host)
-info "Syncing secrets into OpenShell..."
-openshell_secret_set TELEGRAM_BOT_TOKEN  "$TELEGRAM_BOT_TOKEN"
-openshell_secret_set TELEGRAM_CHAT_ID    "$TELEGRAM_CHAT_ID"
-openshell_secret_set HERMES_GATEWAY_SECRET "${HERMES_GATEWAY_SECRET:-}"
-
-# Step 5: Apply policy
-info "Applying sandbox policy..."
-openshell policy set "$POLICY_NAME" \
-    --policy "$REPO_ROOT/config/openshell/policy.yaml" --wait
-
-# Step 6: Register/update profile
-info "Registering sandbox profile..."
-if openshell profile list 2>/dev/null | grep -q "$PROFILE_NAME"; then
-    openshell profile update "$REPO_ROOT/config/openshell/profile.yaml" 2>/dev/null || \
-        openshell profile register "$REPO_ROOT/config/openshell/profile.yaml"
-else
-    openshell profile register "$REPO_ROOT/config/openshell/profile.yaml"
-fi
-
-# Step 7: Build hermes image
-info "Building hermes image..."
-podman build -t hushmoney-hermes "$REPO_ROOT"
-
-# Step 8: (Re)create sandbox
+# Step 4: (Re)create sandbox from our Dockerfile
+# Secrets are uploaded via .env; policy is applied inline at create time.
 if sandbox_exists; then
-    info "Recreating sandbox..."
-    openshell sandbox stop  "$SANDBOX_NAME" 2>/dev/null || true
+    info "Removing existing sandbox..."
     openshell sandbox delete "$SANDBOX_NAME" 2>/dev/null || true
 fi
 
-info "Creating sandbox $SANDBOX_NAME..."
-openshell sandbox create --from "$PROFILE_NAME" --name "$SANDBOX_NAME"
+info "Creating sandbox $SANDBOX_NAME (builds image — may take a minute)..."
+openshell sandbox create \
+    --from "$REPO_ROOT" \
+    --name "$SANDBOX_NAME" \
+    --policy "$REPO_ROOT/config/openshell/policy.yaml" \
+    --provider nebius \
+    --upload "$ENV_FILE":/app/.env \
+    -- /app/docker-entrypoint.sh &
+SANDBOX_PID=$!
+info "Hermes sandbox started (PID $SANDBOX_PID)."
 
-# Step 9: Start forwarder via podman compose (runs outside the sandbox)
+# Step 5: Start forwarder via podman compose (runs outside the sandbox)
 info "Starting forwarder..."
 HERMES_UID=$(id -u) HERMES_GID=$(id -g) podman compose up -d forwarder
 

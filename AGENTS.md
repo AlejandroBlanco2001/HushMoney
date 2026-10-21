@@ -94,6 +94,39 @@ hushmoney/
 | Database | SQLite (managed by Hermes) |
 | User notifications | Telegram |
 
+## Product Direction
+
+HushMoney is competing in the **NVIDIA Personal AI Track** (`docs/path.md`). The judging criteria shape every product decision. When in doubt about what to build next, use this section as the compass.
+
+### North Star
+
+An always-on, private financial assistant that runs on infrastructure you own, processes your data locally, and requires zero manual input from the user.
+
+### What "Done" Looks Like for the Hackathon
+
+| Criterion | Current state | Gap |
+|---|---|---|
+| Always-on | Forwarder polls IMAP; Pyrogram listener watches Telegram | OpenShell gateway unstable on NixOS |
+| Private / data under control | All data in local SQLite; sanitizer strips PII before Hermes sees it | Good — maintain this |
+| Persistent memory | SQLite via Hermes skills | Expand: spending patterns, user preferences, debt history |
+| Reusable skills | expense_tracker, categorizer, debt_tracker, summaries, bank_learning | Add: budget alerts, recurring detection, multi-bank |
+| NVIDIA open model | Nebius Serverless wired | Confirm model is NVIDIA open-weight (e.g. Llama or Mistral on Nebius) |
+| OpenShell sandbox | Planned — blocked by NixOS kernel restriction (`/dev/kmsg`) | Fix or demo on a Linux VM where rootless k3s works |
+| Hermes Agent | Core runtime | Skills are the extension point — keep the core narrow |
+| Nebius Serverless | Inference provider registered | Already done |
+
+### Where to Add Capability
+
+New user-facing features belong in `skills/` — not in the forwarder, not in `gateway_server.py`. The forwarder's job is to deliver a clean, structured `CleanPayload`; Hermes decides what to do with it.
+
+New ingestion sources (SMS, push notifications, other banks) belong in `forwarder/` as new channel modules alongside `imap.py`.
+
+### What Not to Build
+
+- Do not add retry logic, queuing, or state to the forwarder — it must stay stateless.
+- Do not put secrets or user preferences in `config/hermes.yaml` — only non-secret behavior config goes there.
+- Do not duplicate parsing logic between channels — the sanitizer in `forwarder/sanitizer/` is shared by all of them.
+
 ## Core Invariants
 
 These must not be violated under any circumstances:
