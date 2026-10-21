@@ -38,3 +38,4 @@ logs/
 # Cloudflare / Node (Email Worker)
 node_modules/
 .wrangler/
+gen.session

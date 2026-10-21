@@ -100,6 +100,16 @@ fi
 
 load_env
 
+# ── Telegram session ───────────────────────────────────────────────────────────
+
+if [[ -z "${TELEGRAM_SESSION_STRING:-}" ]]; then
+    info "No TELEGRAM_SESSION_STRING found — generating one now."
+    info "You will be prompted for your phone number and a Telegram OTP."
+    uv run --python cpython-3.12 --with pyrogram --with python-dotenv \
+        python "$REPO_ROOT/scripts/gen_session.py" "$ENV_FILE"
+    load_env  # reload so the new value is available for the rest of the script
+fi
+
 # ── Plain mode (--no-openshell) ────────────────────────────────────────────────
 
 if [[ "$USE_OPENSHELL" == false ]]; then
