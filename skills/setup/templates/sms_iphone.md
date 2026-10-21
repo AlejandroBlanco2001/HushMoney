@@ -1,39 +1,30 @@
-📱 **iPhone SMS forwarding — Shortcuts automation**
+📱 **iPhone SMS forwarding — one-time setup**
 
-This automation runs silently in the background. When your bank sends you an SMS, it automatically forwards the text to this bot — no tapping required.
-
-**What you need:** iPhone with the Shortcuts app (pre-installed on iOS 13+) and Telegram.
+Two taps and you're done. Bank SMSs will forward to this chat automatically after that.
 
 ---
 
-**Step 1: Find your bank's SMS sender name or number**
-Look at a recent bank SMS. The sender appears at the top — it's either a short number (e.g. `32424`) or a name (e.g. `Bancolombia`). Note it down.
+**Step 1 — Save your bank as a contact**
+
+Open Messages and find a recent SMS from your bank.
+Tap the sender at the top → **Create New Contact** → name it `Bancolombia` (or your bank's name).
+
+Repeat for each bank you want to forward.
 
 ---
 
-**Step 2: Create the automation**
+**Step 2 — Install the Shortcut**
 
-1. Open the **Shortcuts** app
-2. Tap **Automation** (bottom tab) → **+** → **New Automation**
-3. Scroll down and tap **Message**
-4. Under *From*, tap **Choose** and enter your bank's sender name or number
-5. Enable **Run Immediately** (toggle off "Ask Before Running")
-6. Tap **Next**
-7. Tap **Add Action** → search for **Get Contents of URL**
-8. Configure the action:
-   - **URL:** `https://api.telegram.org/bot[YOUR_BOT_TOKEN]/sendMessage`
-     *(Replace `[YOUR_BOT_TOKEN]` with your bot token from `.env`)*
-   - **Method:** POST
-   - **Request Body:** JSON
-   - Add key `chat_id` → value: `[YOUR_CHAT_ID]` *(your Telegram user ID from `.env`)*
-   - Add key `text` → tap the field → tap the ✦ variable icon → choose **Message** → **Body**
-9. Tap **Done**
+👉 **[Download the HushMoney Shortcut](https://www.icloud.com/shortcuts/20bece7450e344d79ce97c45033de39b)**
+
+Once installed, open **Shortcuts → Automation** and tap the HushMoney automation.
+Make two small changes:
+
+1. **Sender is** — tap **+** and add the bank contact(s) you just saved
+2. **Send to** — tap the current name and change it to **yourself** in Telegram
+
+Tap **Done**. That's it.
 
 ---
 
-**Step 3: Test it**
-Trigger the shortcut manually by sending yourself a test message from the bank sender name, or wait for the next real bank SMS. You should receive it in this Telegram chat automatically.
-
----
-
-💡 **Repeat Step 2 for each bank** if you have multiple banks that use different sender names or numbers.
+💡 To add more banks later, just open the automation again and tap **+** next to the sender list.

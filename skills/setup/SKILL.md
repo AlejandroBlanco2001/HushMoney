@@ -251,9 +251,9 @@ Ask: "What phone do you use?"
 
 #### iPhone
 
-Send `skills/setup/templates/sms_iphone.md`.
-After sending, ask: "Reply when you've set up the Shortcut and I'll confirm it's working."
-Wait for confirmation, then say: "Great — SMS forwarding is active."
+Send `skills/setup/templates/sms_iphone.md` verbatim.
+Then ask: "Reply when you've added the Shortcut and I'll confirm it's working."
+Wait for confirmation, then say: "✅ SMS forwarding is active."
 
 #### Android
 
