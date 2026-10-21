@@ -172,6 +172,13 @@ For **each account**, ask:
 > (These appear as `****1234` in SMS or email alerts — type "skip" to leave blank)
 
 Then ask:
+> What currency is this account in? (Press Enter for COP)
+>
+> Common options: COP, USD, EUR
+
+Use the user's answer uppercased, defaulting to `COP` if blank.
+
+Then ask:
 > Give this account a nickname so I can refer to it in summaries.
 > (e.g. "Bancolombia débito", "Visa gold", or press Enter to skip)
 
@@ -180,7 +187,7 @@ For each account, run:
 python3 skills/setup/scripts/save_accounts.py \
   --bank <slug> \
   --type <type> \
-  --currency COP \
+  --currency <currency> \
   [--masked-number "****XXXX"] \
   [--alias "<nickname>"]
 ```
