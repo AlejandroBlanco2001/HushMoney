@@ -1,8 +1,9 @@
 {
-  "amount": 200000.00,
+  "amount": 200000.0,
   "currency": "COP",
   "date": "2026-10-19T19:30:00Z",
   "transaction_type": "cash",
   "account_type": "checking",
-  "channel": "email"
+  "channel": "email",
+  "bank": "bancolombia"
 }

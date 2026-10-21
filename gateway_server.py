@@ -5,6 +5,8 @@ import contextlib
 import json
 import logging
 import os
+import sqlite3
+import sys
 
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -18,11 +20,83 @@ log = logging.getLogger(__name__)
 GATEWAY_SECRET = os.getenv("HERMES_GATEWAY_SECRET", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 HERMES_BIN = "/root/.local/bin/hermes"
+DB_PATH = os.getenv("HUSHMONEY_DB", os.path.expanduser("~/.hermes/hushmoney.db"))
+
+_SKILL_BASE = "/root/.hermes/skills/hushmoney"
+_STORE_TX   = f"{_SKILL_BASE}/expense_tracker/scripts/store_transaction.py"
+_LOOKUP_CAT = f"{_SKILL_BASE}/categorizer/scripts/lookup_cached_category.py"
+_SAVE_CAT   = f"{_SKILL_BASE}/categorizer/scripts/save_category.py"
 
 _NEBIUS_URL = (os.getenv("OPENAI_BASE_URL", "https://api.studio.nebius.ai/v1/").rstrip("/")
                + "/chat/completions")
 _NEBIUS_MODEL = os.getenv("HERMES_MODEL", "nvidia/nemotron-3-super-120b-a12b")
 _KEEPALIVE_INTERVAL = int(os.getenv("NEBIUS_KEEPALIVE_INTERVAL", "240"))
+
+
+async def _run_script(*args: str) -> dict | None:
+    proc = await asyncio.create_subprocess_exec(
+        *args,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        log.warning("script %s failed: %s", args[1] if len(args) > 1 else args[0], stderr.decode().strip())
+        return None
+    try:
+        return json.loads(stdout.decode())
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+
+async def _store_and_categorize(data: dict) -> tuple[str | None, str | None]:
+    """Store transaction and attempt auto-categorization. Returns (tx_id, category)."""
+    args = [
+        sys.executable, _STORE_TX,
+        "--amount",           str(data["amount"]),
+        "--currency",         data["currency"],
+        "--date",             data["date"],
+        "--transaction-type", data["transaction_type"],
+        "--account-type",     data["account_type"],
+        "--channel",          data["channel"],
+        "--bank",             data.get("bank", "unknown"),
+    ]
+    if data.get("merchant"):
+        args += ["--merchant", data["merchant"]]
+
+    result = await _run_script(*args)
+    if not result or result.get("duplicate"):
+        log.info("transaction duplicate or storage failed")
+        return None, None
+
+    tx_id = result.get("id")
+    log.info("stored transaction %s", tx_id)
+
+    # Auto-categorize if merchant known
+    category = None
+    merchant = data.get("merchant")
+    if tx_id and merchant:
+        cat_result = await _run_script(sys.executable, _LOOKUP_CAT, "--merchant", merchant)
+        if cat_result and cat_result.get("category"):
+            category = cat_result["category"]
+            await _run_script(sys.executable, _SAVE_CAT, "--id", tx_id, "--category", category)
+            log.info("auto-categorized %s → %s", merchant, category)
+
+    return tx_id, category
+
+
+def _lookup_account_alias(bank: str, account_type: str, currency: str) -> str | None:
+    """Return the registered account alias for this (bank, type, currency) triple."""
+    try:
+        con = sqlite3.connect(DB_PATH)
+        row = con.execute(
+            "SELECT alias FROM accounts WHERE bank = ? AND type = ? AND currency = ? LIMIT 1",
+            (bank, account_type, currency),
+        ).fetchone()
+        con.close()
+        return str(row[0]) if row and row[0] else None
+    except Exception:
+        return None
 
 
 async def _keepalive_loop() -> None:
@@ -74,17 +148,30 @@ async def gateway(request: Request) -> JSONResponse:
     merchant = data.get("merchant")
     date = str(data.get("date", ""))[:10]
     channel = data.get("channel", "")
+    bank = data.get("bank", "unknown")
+    account_type = data.get("account_type", "")
 
+    log.info("incoming transaction type=%s amount=%s channel=%s bank=%s",
+             transaction_type, amount, channel, bank)
+
+    # Store and auto-categorize
+    tx_id, category = await _store_and_categorize(data)
+
+    # Build notification
     type_label = str(transaction_type).replace("_", " ").title()
     amount_str = f"{amount:,.0f}" if isinstance(amount, (int, float)) else str(amount or "")
-    line2_parts = [f"{currency} {amount_str}".strip()]
+    parts = [f"{currency} {amount_str}".strip()]
     if merchant:
-        line2_parts.append(merchant)
+        parts.append(merchant)
     if date:
-        line2_parts.append(date)
-    message = f"💳 *{type_label}*\n{' | '.join(line2_parts)}"
+        parts.append(date)
 
-    log.info("dispatching to hermes type=%s amount=%s channel=%s", transaction_type, amount_str, channel)
+    alias = _lookup_account_alias(bank, account_type, currency)
+    account_line = f" — {alias}" if alias else (f" — {bank.title()}" if bank != "unknown" else "")
+
+    message = f"💳 *{type_label}*{account_line}\n{' | '.join(parts)}"
+    if category:
+        message += f"\n🏷️ {category.replace('_', ' ').title()}"
 
     proc = await asyncio.create_subprocess_exec(
         HERMES_BIN, "send", "--to", f"telegram:{TELEGRAM_CHAT_ID}", message,
@@ -97,8 +184,8 @@ async def gateway(request: Request) -> JSONResponse:
         log.error("hermes send failed: %s", stderr.decode())
         return JSONResponse({"error": "send failed"}, status_code=500)
 
-    log.info("sent to telegram")
-    return JSONResponse({"ok": True})
+    log.info("notification sent tx_id=%s", tx_id)
+    return JSONResponse({"ok": True, "tx_id": tx_id})
 
 
 app = Starlette(lifespan=lifespan, routes=[Route("/gateway", gateway, methods=["POST"])])

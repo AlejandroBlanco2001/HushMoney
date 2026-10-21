@@ -1,7 +1,7 @@
 ---
 name: summaries
 description: Generate daily, weekly, and monthly spending summaries
-version: 0.1.0
+version: 0.2.0
 author: hushmoney
 metadata:
   hermes:
@@ -20,13 +20,70 @@ metadata:
 # Summaries
 
 ## When to Use
-On schedule (daily / weekly / monthly) or when the user requests a summary on demand.
+
+- Proactive: triggered by cron (daily/weekly/monthly)
+- Reactive: triggered when user asks about spending ("how much did I spend?",
+  "¿cuánto gasté?", "show my summary", "resumen de gastos", etc.)
 
 ## Procedure
-1. TODO
+
+### Step 1 — Determine period
+
+Resolve the period from the user's message or the cron trigger:
+- "hoy" / "today" / daily cron → `--period today`
+- "esta semana" / "this week" → `--period week`
+- "este mes" / "this month" / monthly cron → `--period month`
+- Custom range → `--from YYYY-MM-DD --to YYYY-MM-DD`
+
+Run:
+```
+python3 /root/.hermes/skills/hushmoney/summaries/scripts/query_transactions.py \
+  --period <period>
+```
+
+Transfer-in transactions are excluded by default (not spending).
+
+### Step 2 — Format the response
+
+Parse the JSON. If `count == 0`:
+> No spending recorded for [period].
+
+Otherwise, format an expressive summary. **Always include account and card info.**
+
+#### Format example
+
+```
+📊 *Gastos de esta semana*
+
+💳 Bancolombia débito (****1234)
+  • UBER — COP 6,930 (Transporte)
+  • RAPPI — COP 32,000 (Comida)
+  Subtotal: COP 38,930
+
+💳 Visa Bancolombia (****9012)
+  • NETFLIX — COP 18,900 (Entretenimiento)
+  Subtotal: COP 18,900
+
+─────────────
+Total: COP 57,830
+```
+
+Rules:
+- Group by account alias (fallback: bank + type if no alias)
+- Show card `masked_number` when `card` is not null
+- Show category in parentheses when set; omit when null
+- If multiple currencies, show a total per currency — never mix them
+- List newest-first within each group; cap at 10 per account + "N more…"
+
+#### Proactive cron rules
+
+- **Daily** (20:00): skip if `count == 0` — no message when there's nothing to report
+- **Weekly** (Monday 09:00): always send
+- **Monthly** (1st 09:00): always send
 
 ## Pitfalls
-- TODO
 
-## Verification
-- TODO
+- Never invent transactions — only report what `query_transactions.py` returns.
+- Do not add different currencies into a single total.
+- If `query_transactions.py` errors (DB missing), reply:
+  > "No transactions recorded yet. I'll start tracking once your first bank notification arrives."

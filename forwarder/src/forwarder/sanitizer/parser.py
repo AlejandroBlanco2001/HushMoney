@@ -30,6 +30,7 @@ def parse(text: str, channel: Channel, bank: BankPatterns) -> CleanPayload | Non
             account_type=transaction.account_type,
             channel=channel,
             merchant=match.groupdict().get('merchant'),
+            bank=bank.name,
         )
     return None
 

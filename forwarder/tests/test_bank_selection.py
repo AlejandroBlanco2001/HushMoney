@@ -95,4 +95,5 @@ def test_new_bank_only_needs_a_definition_and_registry_entry(monkeypatch):
             'transaction_type': 'debit',
             'account_type': 'savings',
             'channel': channel,
+            'bank': 'synthetic-bank',
         }

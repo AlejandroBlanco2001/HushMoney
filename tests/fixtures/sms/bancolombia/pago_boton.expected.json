@@ -1,9 +1,10 @@
 {
-  "amount": 62000.00,
+  "amount": 62000.0,
   "currency": "COP",
   "merchant": "PEXTO CAPITAL SAS",
   "date": "2026-09-14T03:20:37Z",
   "transaction_type": "payment",
   "account_type": "checking",
-  "channel": "sms"
+  "channel": "sms",
+  "bank": "bancolombia"
 }

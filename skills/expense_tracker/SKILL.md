@@ -1,7 +1,7 @@
 ---
 name: expense_tracker
 description: Persist incoming transactions into SQLite
-version: 0.1.0
+version: 0.2.0
 author: hushmoney
 metadata:
   hermes:
@@ -13,41 +13,63 @@ metadata:
 # Expense Tracker
 
 ## When to Use
-Called automatically for every `CleanPayload` that arrives at the gateway. Do not ask the user for confirmation — just store it and report back.
+
+Invoked when the user manually reports a transaction that didn't come through
+a bank notification:
+- Cash transactions: "I paid COP 5,000 cash for a coffee"
+- Corrections: "I spent COP 45,000 at the pharmacy yesterday"
+
+Automatic bank SMS/email transactions are stored directly by `gateway_server.py`
+without going through this skill. Do not invoke this skill for those.
 
 ## Procedure
 
-1. **Compute the message hash** — SHA-256 of `{amount}:{date}:{transaction_type}:{account_type}` (colon-separated, amount as the raw float). You can skip this step and let `store_transaction.py` compute it, or pass `--message-hash` explicitly if you want to check for duplicates first.
+### Step 1 — Extract fields
 
-2. **Check for duplicates** (optional but cheap):
-   ```
-   python3 skills/expense_tracker/scripts/check_duplicate.py --hash <hash>
-   ```
-   If `duplicate: true`, stop — the transaction was already recorded.
+- `amount`: numeric (required)
+- `currency`: COP if not specified
+- `date`: ISO 8601 UTC — use now if not mentioned
+- `transaction_type`: debit / credit / cash / transfer_out / transfer_in / payment / top_up
+- `account_type`: checking / savings / credit / digital_wallet — ask if unclear
+- `channel`: always `telegram` for manually-reported transactions
+- `merchant`: business name (optional)
+- `bank`: bancolombia / davivienda / nequi / bbva / unknown
 
-3. **Store the transaction**:
-   ```
-   python3 skills/expense_tracker/scripts/store_transaction.py \
-     --amount <amount> \
-     --currency <currency> \
-     --date <ISO 8601 UTC date> \
-     --transaction-type <debit|credit|cash|transfer_in|transfer_out|payment|top_up> \
-     --account-type <checking|savings|credit|digital_wallet> \
-     --channel <email|sms> \
-     [--merchant <MERCHANT>] \
-     [--bank <bank_slug>]
-   ```
-   The script is idempotent — a duplicate hash produces `{"ok": true, "duplicate": true}` without inserting.
+### Step 2 — Store
 
-4. **Pass the transaction ID** to the `categorizer` skill so the transaction gets tagged.
+```
+python3 /root/.hermes/skills/hushmoney/expense_tracker/scripts/store_transaction.py \
+  --amount <amount> \
+  --currency <currency> \
+  --date <ISO 8601 UTC> \
+  --transaction-type <type> \
+  --account-type <account_type> \
+  --channel telegram \
+  [--merchant <MERCHANT>] \
+  [--bank <slug>]
+```
 
-## Bank Slug
-Use lowercase, no spaces: `bancolombia`, `davivienda`, `nequi`, `bbva`. If the bank is unknown, omit `--bank` and it defaults to `unknown`. The account will be created automatically on first use.
+If `duplicate: true` in the response:
+> That transaction looks like a duplicate — I already have it recorded.
+
+### Step 3 — Categorize
+
+```
+python3 /root/.hermes/skills/hushmoney/categorizer/scripts/lookup_cached_category.py \
+  --merchant "<merchant>"
+```
+If category found, save it:
+```
+python3 /root/.hermes/skills/hushmoney/categorizer/scripts/save_category.py \
+  --id <id> --category <slug>
+```
+
+### Step 4 — Confirm
+
+> ✅ Recorded: COP 5,000 · Coffee · [account alias or bank] · [category]
 
 ## Pitfalls
-- Never write transaction data to files. Always use `store_transaction.py`.
-- Do not store raw notification text anywhere — the payload arriving here is already sanitized.
-- `--date` must be ISO 8601 UTC (e.g. `2026-10-21T09:56:00Z`). Convert local times before passing.
 
-## Verification
-After storing, confirm with the user only for cash operations (the gateway handles this — see `notifications.cash_operations_only` in `hermes.yaml`). For all other transaction types, store silently.
+- `--date` must be ISO 8601 UTC (e.g. `2026-10-21T09:56:00Z`). Convert local times.
+- `--channel` is always `telegram` for manually-reported transactions.
+- Never write transaction data to files. Always use `store_transaction.py`.

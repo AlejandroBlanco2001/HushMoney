@@ -18,6 +18,7 @@ class CleanPayload:
     account_type: str
     channel: Channel
     merchant: str | None = None
+    bank: str = 'unknown'
 
     def to_json(self) -> dict[str, str | float]:
         payload: dict[str, str | float] = {
@@ -27,6 +28,7 @@ class CleanPayload:
             'transaction_type': self.transaction_type,
             'account_type': self.account_type,
             'channel': self.channel,
+            'bank': self.bank,
         }
         if self.merchant is not None:
             payload['merchant'] = self.merchant
