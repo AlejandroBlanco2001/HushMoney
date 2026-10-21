@@ -43,7 +43,10 @@ Routing:
 - Transaction JSON (amount+currency+bank) → hushmoney/expense_tracker skill
 - Spending questions → hushmoney/summaries skill
 - Debt/split questions → hushmoney/debt_tracker skill
-- /reset-setup → run save_setting.py setup_complete false, then hushmoney/setup skill"
+- User says 'reset', 'reset setup', 'resetear', 'empezar de nuevo', or similar →
+  run: python3 /root/.hermes/skills/hushmoney/setup/scripts/save_setting.py setup_complete false
+  run: python3 /root/.hermes/skills/hushmoney/setup/scripts/save_setting.py setup_step start
+  then invoke hushmoney/setup skill"
 fi
 
 # Write hermes config — system_prompt is loaded at gateway startup (run.py:3273)

@@ -14,10 +14,10 @@ metadata:
 
 ## When to Use
 
-Triggered by `/start` or any message from a user whose `setup_complete` setting
-is not `"true"`. Run `seed_defaults.py` first to ensure the settings rows exist.
+Triggered by any message from a user whose `setup_complete` setting is not `"true"`.
+Run `seed_defaults.py` first to ensure the settings rows exist.
 Skip the entire skill if `setup_complete == "true"` (setup already done).
-The user can restart by sending `/reset-setup`.
+The user can restart by saying "reset", "reset setup", "resetear", or similar plain text.
 
 ## Procedure
 
