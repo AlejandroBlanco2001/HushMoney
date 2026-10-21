@@ -28,7 +28,7 @@ app = Client(
 async def handle(client: Client, msg: Message) -> None:
     if msg.chat.id != MY_ID or not msg.text:
         return
-    print(f"SMS received: {msg.text!r}")
+    print(f"SMS received: {msg.text!r}", flush=True)
     update = {
         "update_id": msg.id,
         "message": {
@@ -46,7 +46,7 @@ async def handle(client: Client, msg: Message) -> None:
             headers={"X-Telegram-Bot-Api-Secret-Token": WEBHOOK_SECRET},
         )
     status = "ok" if resp.status_code == 200 else f"error {resp.status_code}"
-    print(f"Forwarded: {status}")
+    print(f"Forwarded: {status}", flush=True)
 
 
 @app.on_message()

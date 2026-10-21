@@ -71,6 +71,7 @@ services:
       - TELEGRAM_SESSION_STRING=${TELEGRAM_SESSION_STRING}
       - TELEGRAM_WEBHOOK_SECRET=${TELEGRAM_WEBHOOK_SECRET}
       - FORWARDER_WEBHOOK_URL=http://forwarder:9000/telegram
+      - PYTHONUNBUFFERED=1
     depends_on:
       - forwarder
 
