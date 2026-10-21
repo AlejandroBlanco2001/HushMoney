@@ -1,6 +1,19 @@
 #!/bin/sh
 set -e
 
+# Source .env if present (uploaded by openshell sandbox create)
+if [ -f /app/.env ]; then
+    set -a; . /app/.env; set +a
+fi
+
+# Write hermes model config — model goes in config.yaml; .env is for secrets only
+mkdir -p /root/.hermes
+cat > /root/.hermes/config.yaml << 'EOF'
+model: nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B
+provider: openai
+base_url: https://api.studio.nebius.ai/v1/
+EOF
+
 # Start Telegram gateway in background
 hermes gateway run &
 
