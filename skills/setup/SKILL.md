@@ -29,6 +29,13 @@ The user can restart by sending `/reset-setup`.
    - Stop.
 3. Read `setup_step` from output to resume a partial setup (values: `start`,
    `email_provider`, `email_credentials`, `email_senders`, `accounts`, `sms`, `done`).
+4. Run: `python3 /root/.hermes/skills/hushmoney/setup/scripts/load_accounts_md.py`
+   - If `ready: false` → continue normally (user will fill accounts interactively in Step 3).
+   - If `ready: true` → tell the user:
+     > ✅ Found your pre-filled accounts file — loaded [N] account(s) automatically.
+     > [List each: bank / type / alias]
+     Then run: `python3 /root/.hermes/skills/hushmoney/setup/scripts/save_setting.py accounts_configured true`
+     Skip Step 3 entirely (jump to Step 4).
 
 ---
 

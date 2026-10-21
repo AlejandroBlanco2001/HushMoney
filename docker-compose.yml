@@ -25,6 +25,7 @@ services:
       - ./config/hermes.yaml:/app/hermes.yaml:ro
       - ./config/schema.sql:/app/config/schema.sql:ro
       - ./config/SOUL.md:/app/SOUL.md:ro
+      - ./config/accounts.md:/app/accounts.md:ro
     environment:
       - HERMES_UID=${HERMES_UID:-1000}
       - HERMES_GID=${HERMES_GID:-1000}
