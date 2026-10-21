@@ -59,7 +59,7 @@ services:
     restart: unless-stopped
     command: sh -c "pip install -q uv && uv run --python cpython-3.12 --with pyrogram --with python-dotenv python /app/sms_listener.py"
     volumes:
-      - ./scripts/sms_listener.py:/app/sms_listener.py:ro
+      - ./forwarder/scripts/sms_listener.py:/app/sms_listener.py:ro
     environment:
       - TELEGRAM_API_ID=${TELEGRAM_API_ID}
       - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
