@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import json
 import logging
 import os
 
@@ -16,6 +18,46 @@ log = logging.getLogger(__name__)
 GATEWAY_SECRET = os.getenv("HERMES_GATEWAY_SECRET", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 HERMES_BIN = "/root/.local/bin/hermes"
+
+_NEBIUS_URL = (os.getenv("OPENAI_BASE_URL", "https://api.studio.nebius.ai/v1/").rstrip("/")
+               + "/chat/completions")
+_NEBIUS_MODEL = os.getenv("HERMES_MODEL", "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B")
+_KEEPALIVE_INTERVAL = int(os.getenv("NEBIUS_KEEPALIVE_INTERVAL", "240"))
+
+
+async def _keepalive_loop() -> None:
+    api_key = os.getenv("NEBIUS_API_KEY") or os.getenv("OPENAI_API_KEY", "")
+    payload = json.dumps({
+        "model": _NEBIUS_MODEL,
+        "messages": [{"role": "user", "content": "ping"}],
+        "max_tokens": 1,
+    })
+    while True:
+        await asyncio.sleep(_KEEPALIVE_INTERVAL)
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "curl", "-sf", "-X", "POST", _NEBIUS_URL,
+                "-H", f"Authorization: Bearer {api_key}",
+                "-H", "Content-Type: application/json",
+                "-d", payload,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await proc.wait()
+            log.info("nebius keepalive rc=%d", proc.returncode)
+        except Exception as exc:
+            log.warning("nebius keepalive failed: %s", exc)
+
+
+@contextlib.asynccontextmanager
+async def lifespan(_app: Starlette):
+    task = asyncio.create_task(_keepalive_loop())
+    try:
+        yield
+    finally:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
 
 
 async def gateway(request: Request) -> JSONResponse:
@@ -59,4 +101,4 @@ async def gateway(request: Request) -> JSONResponse:
     return JSONResponse({"ok": True})
 
 
-app = Starlette(routes=[Route("/gateway", gateway, methods=["POST"])])
+app = Starlette(lifespan=lifespan, routes=[Route("/gateway", gateway, methods=["POST"])])
