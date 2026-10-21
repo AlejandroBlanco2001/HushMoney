@@ -27,7 +27,7 @@ from forwarder.sanitizer import sanitize
 
 log = logging.getLogger(__name__)
 MAX_BODY_BYTES = 64 * 1024
-COMMANDS = frozenset({'/start', '/help', '/status', '/new', '/stop'})
+COMMANDS = frozenset({'/start', '/help', '/status', '/new', '/stop', '/reset-setup'})
 
 
 @dataclass(frozen=True)
