@@ -17,6 +17,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="$REPO_ROOT/.env"
 SANDBOX_NAME="hushmoney-1"
+BOX_NAME="hushmoney"
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -48,15 +49,11 @@ load_env() {
     set -a; source "$ENV_FILE"; set +a
 }
 
-sandbox_setting_set() {
-    local sandbox="$1" key="$2" value="$3"
-    openshell settings set "$sandbox" --key "$key" --value "$value" 2>/dev/null || \
-        warn "Could not set setting $key on sandbox $sandbox"
-}
+# Run a command inside the Ubuntu distrobox where k3s/kubelet work properly.
+box() { distrobox run --name "$BOX_NAME" -- env DOCKER_HOST="unix:///run/podman/podman.sock" "$@"; }
 
-sandbox_exists() {
-    openshell sandbox list 2>/dev/null | grep -q "$SANDBOX_NAME"
-}
+box_exists()     { distrobox list 2>/dev/null | grep -q "$BOX_NAME"; }
+sandbox_exists() { box openshell sandbox list 2>/dev/null | grep -q "$SANDBOX_NAME"; }
 
 
 # ── Down ───────────────────────────────────────────────────────────────────────
@@ -65,9 +62,9 @@ if [[ "$MODE" == down ]]; then
     info "Stopping forwarder..."
     podman compose down 2>/dev/null || true
 
-    if command -v openshell &>/dev/null && sandbox_exists; then
+    if box_exists && sandbox_exists; then
         info "Stopping OpenShell sandbox..."
-        openshell sandbox delete "$SANDBOX_NAME" 2>/dev/null || true
+        box openshell sandbox delete "$SANDBOX_NAME" 2>/dev/null || true
     fi
 
     info "Done."
@@ -77,9 +74,9 @@ fi
 # ── Logs ───────────────────────────────────────────────────────────────────────
 
 if [[ "$MODE" == logs ]]; then
-    if command -v openshell &>/dev/null && sandbox_exists; then
+    if box_exists && sandbox_exists; then
         info "Hermes sandbox logs (ctrl-c to exit):"
-        openshell logs "$SANDBOX_NAME" --tail &
+        box openshell logs "$SANDBOX_NAME" --tail &
         HERMES_LOG_PID=$!
     else
         info "Hermes container logs (ctrl-c to exit):"
@@ -129,30 +126,30 @@ fi
 
 # ── OpenShell mode (default) ───────────────────────────────────────────────────
 
-# Step 1: Install OpenShell if missing
-if ! command -v openshell &>/dev/null; then
-    info "Installing OpenShell..."
-    curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
-    # Reload PATH in case the installer added a new directory
-    export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"
+# Step 1: Create Ubuntu distrobox if missing (k3s/kubelet work correctly inside it)
+if ! box_exists; then
+    info "Creating Ubuntu distrobox '$BOX_NAME' (one-time setup)..."
+    distrobox create --name "$BOX_NAME" --image ubuntu:24.04 --yes
+    distrobox enter "$BOX_NAME" -- true  # initialise the box
 fi
 
-# Rootful Podman socket — required for OpenShell (k3s kubelet needs /dev/kmsg,
-# which is blocked in rootless user-namespace containers on NixOS)
-export DOCKER_HOST="unix:///run/podman/podman.sock"
+# Step 2: Install OpenShell inside the box if missing
+if ! box openshell version &>/dev/null; then
+    info "Installing OpenShell inside '$BOX_NAME'..."
+    box bash -c "curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh"
+fi
 
-# Step 2: Ensure gateway is running (auto-starts if needed)
-# openshell status exits 0 even with no active gateway; provider list requires one
-if ! openshell provider list &>/dev/null; then
+# Step 3: Ensure gateway is running inside the box
+if ! box openshell provider list &>/dev/null; then
     info "Starting OpenShell gateway..."
-    openshell gateway start
+    box openshell gateway start
 fi
 
-# Step 3: Register Nebius inference provider (idempotent)
-if ! openshell provider list 2>/dev/null | grep -q "nebius"; then
+# Step 4: Register Nebius inference provider (idempotent)
+if ! box openshell provider list 2>/dev/null | grep -q "nebius"; then
     info "Registering Nebius inference provider..."
     [[ -z "${NEBIUS_API_KEY:-}" ]] && error "NEBIUS_API_KEY not set in .env"
-    openshell provider create \
+    box openshell provider create \
         --name nebius \
         --type openai \
         --credential "NEBIUS_API_KEY=$NEBIUS_API_KEY" \
@@ -161,21 +158,19 @@ else
     info "Nebius provider already registered."
 fi
 
-# Step 4: Create sandbox — reuse if already running to skip the image build.
+# Step 5: Create sandbox — reuse if already running to skip the image pull.
 if sandbox_exists; then
     info "Sandbox $SANDBOX_NAME already exists — reusing it."
-    SANDBOX_PID=""
 else
-    info "Creating sandbox $SANDBOX_NAME (first run — builds image, may take a few minutes)..."
-    openshell sandbox create \
-        --from "$REPO_ROOT" \
+    info "Creating sandbox $SANDBOX_NAME..."
+    box openshell sandbox create \
+        --from ghcr.io/alejandroblanco2001/untyped:latest \
         --name "$SANDBOX_NAME" \
         --policy "$REPO_ROOT/config/openshell/policy.yaml" \
         --provider nebius \
         --upload "$ENV_FILE":/app/.env \
         -- /app/docker-entrypoint.sh &
-    SANDBOX_PID=$!
-    info "Hermes sandbox started (PID $SANDBOX_PID)."
+    info "Hermes sandbox starting in background."
 fi
 
 # Step 5: Start forwarder via podman compose (runs outside the sandbox)
