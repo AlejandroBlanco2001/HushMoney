@@ -28,7 +28,7 @@ The user can restart by sending `/reset-setup`.
    - Reply: "You're already set up! Send me a transaction or ask for a summary."
    - Stop.
 3. Read `setup_step` from output to resume a partial setup (values: `start`,
-   `email_provider`, `email_credentials`, `email_senders`, `sms`, `done`).
+   `email_provider`, `email_credentials`, `email_senders`, `accounts`, `sms`, `done`).
 
 ---
 
@@ -138,7 +138,66 @@ Then tell the user:
 
 ---
 
-### Step 3 — SMS channel
+### Step 3 — Accounts
+
+Save progress: `python3 skills/setup/scripts/save_setting.py setup_step accounts`
+
+Tell the user:
+> Now let's map your bank accounts. I'll use this to match transaction notifications
+> to the right account and give you cleaner summaries.
+
+Ask (send as a numbered list):
+> Which banks do you have accounts with? Reply with the numbers separated by commas.
+>
+> 1. Bancolombia
+> 2. Davivienda
+> 3. Nequi
+> 4. BBVA Colombia
+> 5. Other
+
+Map answers to slugs: `bancolombia`, `davivienda`, `nequi`, `bbva`. For "Other", ask for
+the bank name and use it lowercased with no spaces as the slug.
+
+For **each selected bank**, ask:
+> What types of accounts do you have with [Bank]? (Reply with numbers, comma-separated)
+>
+> 1. Checking / Savings account (cuenta de ahorros / corriente)
+> 2. Credit card
+> 3. Digital wallet (Nequi, Daviplata, etc.)
+
+Map to type values: `1` → `checking`, `2` → `credit`, `3` → `digital_wallet`.
+
+For **each account**, ask:
+> What are the last 4 digits shown in [Bank] notifications for this account?
+> (These appear as `****1234` in SMS or email alerts — type "skip" to leave blank)
+
+Then ask:
+> Give this account a nickname so I can refer to it in summaries.
+> (e.g. "Bancolombia débito", "Visa gold", or press Enter to skip)
+
+For each account, run:
+```
+python3 skills/setup/scripts/save_accounts.py \
+  --bank <slug> \
+  --type <type> \
+  --currency COP \
+  [--masked-number "****XXXX"] \
+  [--alias "<nickname>"]
+```
+
+Omit `--masked-number` if the user skipped it. Omit `--alias` if blank.
+
+After all accounts are saved, run:
+```
+python3 skills/setup/scripts/save_setting.py accounts_configured true
+```
+
+Tell the user how many accounts were saved:
+> ✅ Saved [N] account(s). I'll automatically match incoming transactions to these.
+
+---
+
+### Step 4 — SMS channel
 
 Save progress: `python3 skills/setup/scripts/save_setting.py setup_step sms`
 
@@ -170,13 +229,14 @@ Send `skills/setup/templates/sms_android.md`.
 
 ---
 
-### Step 4 — Complete
+### Step 5 — Complete
 
 Run: `python3 skills/setup/scripts/mark_setup_complete.py`
 
 Send:
 > 🎉 Setup complete! Here's what's active:
 > - **Email**: watching [username] for emails from [senders]
+> - **Accounts**: [N] account(s) registered
 > - **SMS**: [configured / not configured]
 >
 > I'll notify you on Telegram when I capture a transaction. You can also ask me:
@@ -209,3 +269,5 @@ After setup:
 - `user_settings.email_provider` is set
 - `user_settings.imap_username` is set
 - `user_settings.bank_sender_emails` is set
+- `user_settings.accounts_configured == "true"`
+- At least one row exists in the `accounts` table

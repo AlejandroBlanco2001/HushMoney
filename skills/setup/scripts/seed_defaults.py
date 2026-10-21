@@ -23,6 +23,7 @@ DEFAULTS: dict[str, str] = {
     'imap_port':           '993',
     'imap_username':       '',
     'bank_sender_emails':  '',
+    'accounts_configured': 'false',
     'sms_channel_enabled': 'false',
 }
 
