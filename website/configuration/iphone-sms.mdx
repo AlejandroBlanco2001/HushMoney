@@ -1,0 +1,77 @@
+---
+title: iPhone SMS Forwarding
+description: Automatically capture bank SMS notifications from your iPhone.
+---
+
+Bank SMS notifications arrive on your iPhone. HushMoney captures them using an iPhone Shortcut that forwards the message to your Telegram Saved Messages, where a Pyrogram listener picks it up.
+
+## How it works
+
+```
+Bank SMS → iPhone Shortcut → Telegram Saved Messages → Pyrogram listener → Forwarder → Hermes
+```
+
+The Pyrogram listener (`sms-listener` container) is logged in as your Telegram user account. It watches your Saved Messages (your self-chat) for new messages and forwards matching ones to the forwarder.
+
+## Step 1 — Install the Shortcut
+
+<Note>
+  A pre-built Shortcut link is available in `docs/telegram.md`. Open it on your iPhone to install in one tap.
+</Note>
+
+Or build it manually in the Shortcuts app:
+
+1. Open **Shortcuts** → **Automation** → **New Automation**
+2. Trigger: **Message received** → Filter: **From** → add your bank's number
+3. Action: **Send Message**
+   - Message: the SMS text (use the shortcut variable for the message body)
+   - Recipient: **yourself** (this sends to your Saved Messages)
+4. Disable **Ask Before Running**
+
+Repeat for each bank number you want to capture.
+
+## Step 2 — Generate a Telegram session string
+
+The SMS listener needs a session string to authenticate as your Telegram user account. This is generated once:
+
+```bash
+./scripts/dev.sh
+```
+
+On first run, `dev.sh` detects the missing `TELEGRAM_SESSION_STRING`, prompts for your phone number and a Telegram OTP, and saves the session string to `.env` automatically.
+
+<Warning>
+  The session string authenticates as your full Telegram user account — treat it like a password. It is stored only in your `.env` and inside the `hermes-data` Docker volume on EC2.
+</Warning>
+
+## Step 3 — Set the Telegram API credentials
+
+The SMS listener requires Telegram API credentials (separate from the bot token):
+
+1. Go to [my.telegram.org](https://my.telegram.org) → **API Development Tools**
+2. Create an app — any name and platform work
+3. Copy `api_id` and `api_hash` into `.env`:
+
+```bash
+TELEGRAM_API_ID=12345678
+TELEGRAM_API_HASH=abcdef1234567890abcdef1234567890
+```
+
+## Step 4 — Verify
+
+Send yourself a test bank SMS (or forward one from your bank). Check the `sms-listener` container logs:
+
+```bash
+docker logs -f sms-listener
+```
+
+You should see the message detected and forwarded to the forwarder, which then dispatches it to Hermes.
+
+## Android
+
+Android does not have a native equivalent of iPhone Shortcuts for automatic SMS forwarding. Options:
+
+- **Tasker** — automate forwarding bank SMS to Telegram Saved Messages
+- **MacroDroid** — similar automation tool
+
+The forwarding destination and format must be identical to the iPhone flow: send the raw SMS text to your Telegram Saved Messages.

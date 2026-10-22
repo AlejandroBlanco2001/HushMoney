@@ -1,0 +1,53 @@
+---
+title: Debt Tracker
+description: Track money owed in both directions via natural language.
+---
+
+Tell Hermes about informal debts in plain language. It keeps a running list of who owes you and who you owe, across any currency.
+
+## Recording a debt
+
+```
+Carlos owes me $50,000 from lunch
+I owe María $120,000 — she paid for my concert ticket
+Sofía borrowed $200,000 last weekend
+```
+
+## Settling a debt
+
+```
+Carlos paid me back
+I settled the $120,000 with María
+mark the Sofía debt as paid
+```
+
+When a debt is settled via a tracked bank transfer, Hermes links the settlement to the transaction automatically.
+
+## Checking balances
+
+```
+who owes me money?
+what do I owe?
+show all active debts
+```
+
+A typical response:
+
+```
+Active debts:
+
+You are owed:
+• Carlos — $50,000 COP (lunch, Oct 14)
+• Sofía — $200,000 COP (weekend loan, Oct 5)
+
+You owe:
+• María — $120,000 COP (concert ticket, Sep 28)
+
+Net: you are owed $130,000 COP
+```
+
+## Notes
+
+- Debts support any currency — just mention it: *"he owes me $35 USD"*
+- There is no payment reminder schedule — debts are purely on-demand
+- Settled debts are kept in the database for history but excluded from active balance queries

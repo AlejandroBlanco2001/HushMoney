@@ -1,0 +1,122 @@
+---
+title: Local Development
+description: Run the full stack on your machine with Docker or Podman.
+---
+
+## Prerequisites
+
+- Docker or Podman
+- Python 3.12+ and [uv](https://docs.astral.sh/uv/)
+- A filled-in `.env` (copy from `.env.example`)
+
+## Start the stack
+
+```bash
+# Docker
+HERMES_UID=$(id -u) HERMES_GID=$(id -g) docker compose up
+
+# Podman
+HERMES_UID=$(id -u) HERMES_GID=$(id -g) podman compose up
+```
+
+SQLite data persists in the `hermes-data` volume across restarts.
+
+To rebuild after a Dockerfile change:
+
+```bash
+docker compose up --build
+```
+
+## Run the forwarder standalone
+
+To run the forwarder in dry-run mode (logs emails, skips Hermes dispatch):
+
+```bash
+set -a && source .env && set +a
+DRY_RUN=true uv run python -m forwarder
+```
+
+## Test the gateway end-to-end
+
+With the stack running, inject a fake bank transaction directly:
+
+```bash
+source .env
+
+curl -s -X POST http://localhost:8080/gateway \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $HERMES_GATEWAY_SECRET" \
+  -d '{
+    "channel": "email",
+    "from": "alerts@bancolombia.com.co",
+    "subject": "Compra aprobada",
+    "body": "Bancolombia le informa: Compra por $45,000 en RAPPI. Tarjeta terminada 1234."
+  }'
+```
+
+If everything is wired, Hermes will process the transaction and send a Telegram message to `TELEGRAM_CHAT_ID`. Watch the logs:
+
+```bash
+docker logs -f hermes
+```
+
+## Run the tests
+
+```bash
+cd forwarder
+uv run pytest
+```
+
+## OpenShell sandbox (optional)
+
+OpenShell wraps Hermes with kernel-level enforcement: filesystem (Landlock), syscalls (Seccomp BPF), and network egress (OPA proxy). The Nebius API key is managed by OpenShell and never enters the container.
+
+**Requires:** Linux 6.2+, Podman 5.x or Docker 28+.
+
+<Steps>
+  <Step title="Install OpenShell">
+    ```bash
+    curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
+    openshell status
+    ```
+  </Step>
+  <Step title="Configure the gateway">
+    ```bash
+    cp config/openshell/gateway.toml ~/.config/openshell/gateway.toml
+    openshell-gateway config preflight --path ~/.config/openshell/gateway.toml
+    ```
+  </Step>
+  <Step title="Register the Nebius provider">
+    ```bash
+    openshell provider create nebius \
+      --endpoint https://api.studio.nebius.ai/v1/ \
+      --api-key $NEBIUS_API_KEY
+    ```
+  </Step>
+  <Step title="Register secrets">
+    ```bash
+    openshell secret set TELEGRAM_BOT_TOKEN "$TELEGRAM_BOT_TOKEN"
+    openshell secret set TELEGRAM_CHAT_ID "$TELEGRAM_CHAT_ID"
+    openshell secret set HERMES_GATEWAY_SECRET "$HERMES_GATEWAY_SECRET"
+    ```
+  </Step>
+  <Step title="Apply policy and register profile">
+    ```bash
+    openshell policy set hushmoney --policy config/openshell/policy.yaml --wait
+    openshell profile register config/openshell/profile.yaml
+    ```
+  </Step>
+  <Step title="Start sandboxed stack">
+    ```bash
+    podman build -t hushmoney-hermes .
+    openshell sandbox create --from hushmoney --name hushmoney-1
+    HERMES_UID=$(id -u) HERMES_GID=$(id -g) podman compose up forwarder
+    ```
+  </Step>
+</Steps>
+
+To enable OpenShell on EC2 as well, pass `--with-openshell` to setup.sh (requires kernel 6.2+):
+
+```bash
+./scripts/setup.sh --with-openshell
+```

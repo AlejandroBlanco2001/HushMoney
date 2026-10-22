@@ -1,0 +1,67 @@
+---
+title: Introduction
+description: Zero-input expense tracking. Your bank tells us; you just check your summary.
+---
+
+HushMoney is a personal AI assistant that intercepts bank notifications from email and SMS, strips all sensitive data at the edge, and hands clean transaction signals to an AI agent that tracks, categorizes, and summarizes your spending — automatically.
+
+No manual entry. No spreadsheets. Just ask.
+
+## How it works
+
+<Steps>
+  <Step title="Bank sends a notification">
+    An email or SMS arrives from your bank — a purchase confirmation, a transfer, a cash withdrawal.
+  </Step>
+  <Step title="Forwarder sanitizes it">
+    The forwarder strips OTPs, full account numbers, recipient names, and any other PII. Only a clean payload reaches the agent: amount, merchant, date, type.
+  </Step>
+  <Step title="Hermes Agent processes it">
+    The agent runs on **NVIDIA Nemotron 3 Nano** via **Nebius Serverless**. It categorizes the transaction, stores it in SQLite, and optionally sends you a Telegram reminder for cash operations.
+  </Step>
+  <Step title="You ask questions">
+    At any time, message your bot on Telegram: *"what did I spend last week?"*, *"show me my subscriptions"*, *"Carlos owes me $50,000 from lunch"*.
+  </Step>
+</Steps>
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card title="Automatic capture" icon="bolt">
+    Bank emails and iPhone SMS are captured and processed without any manual input.
+  </Card>
+  <Card title="Privacy boundary" icon="shield">
+    Raw financial notifications never reach the AI model. The forwarder enforces a hard sanitization boundary.
+  </Card>
+  <Card title="Smart categorization" icon="tag">
+    Groceries, transport, dining, subscriptions — Hermes learns your patterns over time.
+  </Card>
+  <Card title="Debt tracking" icon="handshake">
+    Tell Hermes who owes you and who you owe. It keeps track so you don't have to.
+  </Card>
+  <Card title="Summaries on demand" icon="chart-bar">
+    Ask for a daily, weekly, or monthly breakdown at any time, or have them delivered automatically.
+  </Card>
+  <Card title="Bank learning" icon="graduation-cap">
+    Teach Hermes new bank notification formats interactively via Telegram — no code required.
+  </Card>
+</CardGroup>
+
+## Built with
+
+| Layer | Technology |
+|---|---|
+| AI Agent | [Hermes Agent](https://hermes-agent.nousresearch.com) — NousResearch |
+| Agent Sandbox | NVIDIA OpenShell |
+| Model | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B` via Nebius Serverless |
+| SMS listener | Pyrogram (MTProto user client) |
+| Forwarder | Python 3.12 |
+| Database | SQLite |
+| Notifications | Telegram Bot API |
+| Hosting | AWS EC2 (t3.small) |
+
+## Track
+
+HushMoney was built for the **Personal AI Track** of the Nebius × NVIDIA Global AI Hackathon 2026.
+
+> *"Build an always-on, private assistant that works for you while keeping your data under your control."*

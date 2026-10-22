@@ -1,0 +1,52 @@
+---
+title: Expense Tracker & Categorizer
+description: Automatic transaction storage and spending classification.
+---
+
+The expense tracker and categorizer work together on every incoming transaction: the tracker persists it to SQLite, the categorizer tags it with a spending category.
+
+## What Hermes stores
+
+Every transaction captured from email or SMS results in a record with:
+
+| Field | Example |
+|---|---|
+| Amount | `45000.0` |
+| Currency | `COP` |
+| Merchant | `RAPPI` |
+| Date | `2026-10-20T18:00:00Z` |
+| Type | `debit` |
+| Account | Bancolombia checking |
+| Category | `food` |
+| Channel | `email` |
+| Description | Inferred from merchant name |
+
+## Spending categories
+
+| Category | Examples |
+|---|---|
+| `food` | Rappi, Éxito, Starbucks, D1, Jumbo |
+| `transport` | Uber, Cabify, InDriver, Transmilenio |
+| `entertainment` | Netflix, Spotify, Cine Colombia |
+| `health` | SmartFit, BodyTech, droguería |
+| `shopping` | Amazon, Alkosto, Zara |
+| `services` | Claro, EPM, arriendo |
+| `transfers` | Nequi, Daviplata, transfers |
+| `cash` | ATM withdrawals |
+| `other` | Everything else |
+
+## Duplicate prevention
+
+Every transaction is fingerprinted with a SHA-256 hash of `amount + date + type + account`. If the same notification arrives twice (e.g. from a forwarding retry), the duplicate is silently skipped.
+
+## Asking about transactions
+
+Once transactions are stored, ask Hermes in plain language:
+
+```
+what did I spend last week?
+how much on food this month?
+show me all Uber trips in October
+what are my recurring subscriptions?
+break down my spending by category for September
+```

@@ -1,0 +1,45 @@
+---
+title: Skills Overview
+description: Hermes Agent capabilities, implemented as composable skills.
+---
+
+HushMoney extends Hermes Agent through a **skills system** — discrete, composable capabilities that the agent can invoke as tools. Each skill is a directory of Python scripts that Hermes calls at runtime.
+
+## Available skills
+
+<CardGroup cols={2}>
+  <Card title="Expense Tracker" icon="receipt" href="/skills/expense-tracker">
+    Persists every transaction to SQLite. Finds or creates the account, checks for duplicates, and stores the clean payload.
+  </Card>
+  <Card title="Categorizer" icon="tag" href="/skills/expense-tracker">
+    Classifies transactions into spending categories: food, transport, entertainment, health, shopping, services, transfers, cash.
+  </Card>
+  <Card title="Summaries" icon="chart-bar" href="/skills/summaries">
+    Generates daily, weekly, and monthly breakdowns on demand or on a schedule.
+  </Card>
+  <Card title="Debt Tracker" icon="handshake" href="/skills/debt-tracker">
+    Tracks money owed in both directions. Records debts, marks them settled, and lists active balances.
+  </Card>
+  <Card title="Bank Learning" icon="graduation-cap" href="/skills/bank-learning">
+    Teaches Hermes new bank notification formats interactively, without any code changes.
+  </Card>
+  <Card title="Setup" icon="gear">
+    One-time guided onboarding via Telegram. Runs once on first start, never again.
+  </Card>
+</CardGroup>
+
+## Adding a new skill
+
+Drop a new directory into `skills/` with the following structure:
+
+```
+skills/my-skill/
+├── skill.yaml        # skill metadata and tool definitions
+└── scripts/
+    ├── my_action.py  # one script per tool
+    └── ...
+```
+
+Hermes picks up new skills automatically on the next restart — no changes to the agent or Dockerfile required.
+
+See `AGENTS.md` for the full skill authoring guide.

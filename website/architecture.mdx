@@ -1,0 +1,103 @@
+---
+title: Architecture
+description: System overview, data flows, and component responsibilities.
+---
+
+HushMoney is a **single-user, self-hosted** deployment. One EC2 instance runs for one person. There is no multi-tenancy, no shared infrastructure, no centralized service. You own the bot token, the Gmail account, the EC2 instance, and the SQLite database.
+
+## System overview
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                       Input Sources                      │
+│                                                          │
+│   Bank email notification    Bank SMS (iPhone)           │
+│           │                        │                     │
+│           ▼                        ▼                     │
+│    Gmail inbox              iPhone Shortcut fires:       │
+│    (IMAP poll every 5 min)  sends SMS to Saved Messages  │
+└───────────┬────────────────────────┬─────────────────────┘
+            │                        │
+            ▼                        ▼
+  IMAP Poller                Pyrogram listener
+  (forwarder)                (sms-listener container)
+            │                        │
+            └────────────┬───────────┘
+                         │
+                         ▼
+         ┌───────────────────────────────┐
+         │           Forwarder           │
+         │                               │
+         │   sanitizer/ — strips OTPs,   │
+         │   account numbers, PII        │
+         │                               │
+         │   CleanPayload:               │
+         │   { amount, currency,         │
+         │     merchant, date,           │
+         │     transaction_type,         │
+         │     account_type, channel }   │
+         └──────────────┬────────────────┘
+                        │ HTTP POST
+                        ▼
+         ┌───────────────────────────────┐
+         │        Hermes Agent           │
+         │                               │
+         │   skills/                     │
+         │   ├── expense_tracker         │
+         │   ├── categorizer             │
+         │   ├── debt_tracker            │
+         │   ├── summaries               │
+         │   └── bank_learning           │
+         │                               │
+         │   ┌─────────┐                 │
+         │   │ SQLite  │ persistent mem  │
+         │   └─────────┘                 │
+         │                               │
+         │   Model: Nemotron 3 Nano      │
+         │   via Nebius Serverless       │
+         │                               │
+         │   Sandbox: NVIDIA OpenShell   │
+         └──────────────┬────────────────┘
+                        │ (cash operations only)
+                        ▼
+               Telegram → you
+```
+
+## Components
+
+### Forwarder
+
+Stateless Python 3.12 service with two intake channels:
+
+| Module | Responsibility |
+|---|---|
+| `imap.py` | Polls Gmail every 5 min, parses RFC 822 messages, resolves original sender for forwarded emails |
+| `channels/telegram.py` | Receives webhook updates from the Telegram bot (user-forwarded SMS via Pyrogram) |
+| `sanitizer/` | Strips OTPs, account numbers, card suffixes, PII — emits a `CleanPayload` |
+| `hermes.py` | HTTP POSTs the `CleanPayload` to `gateway_server.py` |
+
+The forwarder holds no state, no database, no retry queue. If dispatch fails, the message is dropped — financial notifications are ephemeral.
+
+### Hermes Agent
+
+[Hermes Agent](https://hermes-agent.nousresearch.com) by NousResearch, running inside a Docker container with an HTTP gateway server (`gateway_server.py`) that receives `CleanPayload` messages and forwards them to the agent.
+
+The agent uses **NVIDIA Nemotron 3 Nano** (`nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B`) served via Nebius Serverless Endpoints for all LLM inference. Nemotron's MoE architecture (3B active / 30B total) keeps latency low for frequent categorization calls while retaining quality for reasoning tasks.
+
+### SMS Listener
+
+`sms-listener` is a Pyrogram user client logged in as your Telegram account. It watches your Saved Messages (self-chat) for new text matching bank notification patterns and forwards them to the forwarder's Telegram channel.
+
+### SQLite
+
+All transaction data, debt records, learned bank patterns, and user settings are stored in a single SQLite file, persisted in the `hermes-data` Docker volume on EC2.
+
+## Infrastructure
+
+| Component | Details |
+|---|---|
+| EC2 instance | t3.small, Amazon Linux 2023, Elastic IP |
+| Container runtime | Docker Compose (3 services: hermes, forwarder, sms-listener) |
+| LLM inference | Nebius Serverless — no GPU on the instance |
+| Database | SQLite on the hermes-data volume |
+| Sandbox | NVIDIA OpenShell (optional, requires kernel 6.2+) |

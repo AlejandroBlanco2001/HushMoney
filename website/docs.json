@@ -1,0 +1,65 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "HushMoney",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#5050cc",
+    "light": "#8080ee",
+    "dark": "#3a3aaa",
+    "anchors": {
+      "from": "#5050cc",
+      "to": "#1a8868"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "https://github.com/AlejandroBlanco2001/Untyped"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Deploy",
+    "url": "https://github.com/AlejandroBlanco2001/Untyped#getting-started"
+  },
+  "tabs": [
+    {
+      "name": "Docs",
+      "url": "/"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": ["introduction", "quickstart", "local-development"]
+    },
+    {
+      "group": "Configuration",
+      "pages": [
+        "configuration/environment-variables",
+        "configuration/bank-setup",
+        "configuration/iphone-sms"
+      ]
+    },
+    {
+      "group": "Skills",
+      "pages": [
+        "skills/overview",
+        "skills/expense-tracker",
+        "skills/summaries",
+        "skills/debt-tracker",
+        "skills/bank-learning"
+      ]
+    },
+    {
+      "group": "Reference",
+      "pages": ["architecture", "security", "demo"]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/AlejandroBlanco2001/Untyped"
+  }
+}

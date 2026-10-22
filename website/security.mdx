@@ -1,0 +1,75 @@
+---
+title: Security & Privacy
+description: How HushMoney keeps your financial data private.
+---
+
+HushMoney is built around a single principle: **raw financial data never reaches the AI model**. The forwarder enforces a hard sanitization boundary before anything touches Hermes.
+
+## The privacy boundary
+
+```
+Bank notification (raw)
+        │
+        ▼
+   Forwarder sanitizer   ← PII stripped here
+        │
+        ▼
+   CleanPayload          ← only this crosses the boundary
+   { amount, merchant,
+     date, type, channel }
+        │
+        ▼
+   Hermes Agent + NVIDIA Nemotron
+```
+
+Everything stripped before crossing the boundary:
+
+- OTPs and verification codes
+- Full account and card numbers
+- Recipient names in transfers
+- Phone numbers
+- Any field not needed for expense tracking
+
+## What Hermes never sees
+
+The agent never receives and never stores:
+
+- Raw email bodies or SMS text
+- Full account numbers (only the last 4 digits, when needed for account matching)
+- OTPs or security codes
+- Transfer recipient names
+- Any content that could identify a third party
+
+## OpenShell sandbox
+
+When running with `--with-openshell`, the Hermes container operates under three kernel-level enforcement layers:
+
+| Layer | Mechanism | What it enforces |
+|---|---|---|
+| Filesystem | Linux Landlock | Agent can only read/write its data directory |
+| Syscalls | Seccomp BPF | Blocks all system calls not on the allowlist |
+| Network egress | OPA proxy | Agent can only reach Nebius API and Telegram endpoints |
+
+The Nebius API key is managed by OpenShell and injected at the policy layer — it never appears inside the container environment.
+
+## Bank learning exception
+
+The bank learning skill in **reactive mode** is the single documented exception to the privacy boundary rule. When a notification arrives from an unknown bank, Hermes briefly accesses the raw message to infer a parsing pattern.
+
+Constraints that must be enforced:
+
+- The raw content is passed to the NVIDIA model for structural inference only
+- The model prompt instructs it to return structure only (positions, delimiters, formats) — not values
+- The raw content is **never stored, never logged, never written to SQLite**
+- Once the pattern is confirmed and saved, all future messages from that bank are sanitized before Hermes sees them
+- If the user declines to confirm the inferred transaction, the raw content is discarded and the transaction is dropped
+
+## Self-hosted by design
+
+Because this is a single-user self-hosted deployment:
+
+- The Telegram bot token belongs to you — no third party can read your messages
+- Gmail credentials are stored only in your `.env` on your EC2 instance
+- The SQLite database never leaves your EC2 volume
+- No financial notification content transits third-party routing services
+- The Nebius API receives only clean, sanitized payloads — never raw bank data

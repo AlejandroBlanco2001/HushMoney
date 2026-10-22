@@ -1,0 +1,54 @@
+---
+title: Summaries
+description: Daily, weekly, and monthly spending rollups delivered to Telegram.
+---
+
+The summaries skill generates spending breakdowns on demand or on a schedule, delivered directly to your Telegram.
+
+## On-demand summaries
+
+Ask Hermes at any time:
+
+```
+summarize this week
+summarize October
+what did I spend last month?
+give me a breakdown for September
+```
+
+## Scheduled summaries
+
+Configure automatic delivery in `config/hermes.yaml`:
+
+```yaml
+summaries:
+  daily:
+    enabled: true
+  weekly:
+    enabled: true
+    day: monday       # delivered every Monday morning
+  monthly:
+    enabled: true
+    day: 1            # delivered on the 1st of each month
+```
+
+## What a summary includes
+
+A typical weekly summary covers:
+
+- **Total spending** for the period
+- **Breakdown by category** — food, transport, entertainment, etc.
+- **Top merchants** — where most money went
+- **Notable transactions** — anything unusually large
+- **Recurring charges** detected that week
+- **Active debts** reminder (if any)
+
+## Cash operation reminders
+
+When a cash withdrawal is detected, Hermes sends an immediate prompt:
+
+```
+Cash withdrawal of $200,000 detected. Add a description? (e.g., groceries, taxi)
+```
+
+Reply with a short description and Hermes updates the transaction record. This is the one case where Hermes proactively contacts you outside of a summary.

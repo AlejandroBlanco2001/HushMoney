@@ -1,0 +1,76 @@
+---
+title: Bank Setup
+description: Configure your bank email notifications for automatic capture.
+---
+
+HushMoney captures transactions from bank email notifications via IMAP polling. No webhook, no domain, no third-party routing required — the forwarder polls your Gmail inbox directly every 5 minutes.
+
+## Step 1 — Enable bank email alerts
+
+In your bank's app or website, enable transaction notifications via email. Look for settings like:
+
+- "Email alerts"
+- "Transaction notifications"
+- "Spending alerts"
+
+Enable alerts for: purchases, transfers, cash withdrawals, and any other transaction types you want to track.
+
+## Step 2 — Note the sender address
+
+Check one of the notification emails your bank sends and copy the exact **From** address — it usually looks like `alerts@yourbank.com` or `no-reply@notifications.bank.com`.
+
+Add it to `.env`:
+
+```bash
+BANK_SENDER_EMAILS=alerts@bancolombia.com.co
+```
+
+For multiple banks, comma-separate:
+
+```bash
+BANK_SENDER_EMAILS=alerts@bancolombia.com.co,no-reply@nequi.com,notificaciones@davivienda.com
+```
+
+## Step 3 — Gmail App Password
+
+The forwarder authenticates to Gmail using an App Password (regular passwords are blocked by Google for IMAP).
+
+1. Enable IMAP: Gmail Settings → **Forwarding and POP/IMAP** → Enable IMAP
+2. Generate App Password: [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) → name it "hushmoney"
+3. Copy the 16-character password (no spaces) into `IMAP_PASSWORD`
+
+## Outlook users
+
+If your bank sends alerts to an Outlook address:
+
+1. In Outlook, create a rule: **Forward** emails from your bank's sender address to your Gmail
+2. In `.env`, set `BANK_SENDER_EMAILS` to the **original bank sender address** (Outlook preserves it in headers)
+3. Set `IMAP_USERNAME` and `IMAP_PASSWORD` to your Gmail credentials
+
+The forwarder automatically recovers the original bank sender from `X-Original-From` and `X-Forwarded-From` headers that Outlook adds during forwarding.
+
+## Supported banks
+
+The forwarder ships with pre-built parsing patterns for:
+
+| Bank | Country | Channel |
+|---|---|---|
+| Bancolombia | Colombia | Email, SMS |
+| Nequi | Colombia | SMS |
+
+For banks not on this list, use the [Bank Learning](/skills/bank-learning) skill to teach Hermes new formats interactively.
+
+## Testing your setup
+
+With the stack running, check the forwarder logs to confirm it's polling and finding emails:
+
+```bash
+docker logs -f forwarder
+```
+
+You should see lines like:
+```
+[forwarder] polling INBOX for alerts@bancolombia.com.co...
+[forwarder] 1 unseen message(s) found
+[forwarder] dispatched to hermes: {"amount": 45000, "merchant": "RAPPI", ...}
+```

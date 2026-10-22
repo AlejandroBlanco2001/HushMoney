@@ -1,0 +1,82 @@
+---
+title: Bank Learning
+description: Teach Hermes new bank notification formats interactively — no code required.
+---
+
+The sanitizer ships with parsing patterns for a set of supported banks. When a notification arrives from an unsupported bank, the bank learning skill takes over and teaches Hermes the new format interactively.
+
+## How patterns work
+
+The sanitizer uses a two-layer fallback:
+
+```
+Notification arrives
+        │
+        ▼
+① Community patterns   ← compiled from the repo at deploy time
+        │ no match
+        ▼
+② Learned patterns     ← stored in SQLite, discovered at runtime
+        │ no match
+        ▼
+   bank_learning skill  ← asks you, infers the pattern, updates layer ②
+```
+
+Once a pattern is learned, all future notifications from that bank are sanitized automatically.
+
+## Reactive learning (automatic)
+
+When both layers fail, Hermes asks you to help:
+
+```
+Hermes: I got a notification I couldn't parse.
+        Which bank sent it?
+
+You: Davivienda
+
+Hermes: [infers structure using NVIDIA Nemotron via Nebius]
+        I think this is a debit purchase of $85,000 at Éxito
+        on 14/09/2026. Correct?
+
+You: yes
+
+Hermes: Pattern saved. I'll recognize Davivienda messages from now on.
+```
+
+## Proactive learning (add a bank before its first notification)
+
+```
+You: hermes add-bank
+
+Hermes: Which bank? Which country?
+
+You: Davivienda, Colombia
+
+Hermes: Send me 2–3 sample notifications from Davivienda.
+        Redact sensitive info first:
+        • Replace account numbers with XXXX
+        • Replace names with NAME
+        • Replace amounts with XX.XXX,XX
+        • Replace OTPs with 000000
+
+You: [pastes 2–3 redacted samples]
+
+Hermes: Pattern saved. Here's what I detected:
+        • Amount: Colombian format ($XX.XXX,XX)
+        • Merchant: extracted from "Compraste X en MERCHANT"
+        • Strips: account suffix, phone numbers
+        Looks right?
+
+You: yes
+```
+
+## Privacy note
+
+In reactive mode, Hermes briefly accesses the raw pre-sanitization message to infer the pattern. This is the **single documented exception** to the privacy boundary rule. Constraints:
+
+- The raw content is passed to the NVIDIA model for structural inference only — never stored, never logged
+- The model is instructed to return structure only (field positions, delimiters, formats), not values
+- Once the pattern is saved, all future messages from that bank are sanitized before Hermes sees them
+- If you decline to confirm the inferred transaction, the raw content is discarded and the transaction is dropped
+
+See [Security](/security) for the full privacy model.

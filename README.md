@@ -50,7 +50,7 @@ Bank email notification          Bank SMS (iPhone → Saved Messages)
 |---|---|
 | AI Agent | [Hermes Agent](https://github.com/NousResearch/hermes-agent) — NousResearch |
 | Agent Sandbox | NVIDIA OpenShell |
-| Models | NVIDIA open models via Nebius Serverless |
+| Model | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B` via Nebius Serverless |
 | SMS listener | Pyrogram (MTProto user client) |
 | Forwarder | Python 3.12 |
 | Database | SQLite |
@@ -69,8 +69,11 @@ hushmoney/
 │       └── hermes.py      # dispatches to gateway_server
 ├── scripts/
 │   ├── dev.sh             # local dev launcher (handles OpenShell + session setup)
-│   ├── sms_listener.py    # Pyrogram listener — Saved Messages → bot
+│   ├── setup.sh           # one-shot EC2 provisioning + stack deploy
+│   ├── seed_demo.sh       # load fake transactions for demo/judging
 │   └── gen_session.py     # one-time Telegram session generator (called by dev.sh)
+├── forwarder/scripts/
+│   └── sms_listener.py    # Pyrogram listener — Saved Messages → bot
 ├── skills/                # Custom Hermes skills
 │   ├── expense_tracker/
 │   ├── categorizer/
@@ -95,8 +98,8 @@ hushmoney/
 ### Setup
 
 ```bash
-git clone https://github.com/your-org/hushmoney
-cd hushmoney
+git clone https://github.com/AlejandroBlanco2001/Untyped.git
+cd Untyped
 cp .env.example .env
 $EDITOR .env   # fill in your tokens and credentials
 ```
@@ -129,6 +132,22 @@ In the Shortcuts app, create an automation that triggers when a message arrives 
 The Pyrogram listener (`scripts/sms_listener.py`) watches your Saved Messages 24/7 and forwards matching messages to your bot automatically.
 
 For more detail, see [docs/architecture.md](docs/architecture.md).
+
+### EC2 deploy
+
+To run on a remote EC2 instance (t3.small recommended):
+
+```bash
+./scripts/setup.sh
+```
+
+Provisions Docker, clones the repo, pushes secrets, and starts the stack. Run once; the stack restarts automatically on reboot.
+
+To pre-populate with demo data:
+
+```bash
+./scripts/seed_demo.sh
+```
 
 ## Security
 
