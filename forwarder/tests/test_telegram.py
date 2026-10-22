@@ -105,7 +105,6 @@ def test_exact_command_routes_without_raw_metadata(harness, update, command):
         ' /help',
         'hermes cuenta 1234',
         'Hola',
-        'Rappipay: compra $32.500,00 cuenta 1234',
         'OTP 000000',
         '',
     ],
@@ -116,6 +115,20 @@ def test_unrecognized_text_never_falls_through_to_chat(harness, update, text):
     client, requests = harness
     assert client.post('/telegram', json=update, headers=HEADERS).status_code == 200
     assert requests == []
+
+
+def test_push_from_unknown_app_forwarded_to_bank_learning(harness, update, cfg):
+    del update['message']['forward_origin']
+    update['message']['text'] = 'Rappipay: compra $32.500,00 cuenta 1234'
+    client, requests = harness
+    assert client.post('/telegram', json=update, headers=HEADERS).status_code == 200
+    assert len(requests) == 1
+    request = requests[0]
+    assert str(request.url) == cfg.hermes_webhook_url
+    assert request.headers['x-telegram-bot-api-secret-token'] == cfg.webhook_secret
+    body = json.loads(request.content)
+    assert body['message']['text'] == 'Rappipay: compra $32.500,00 cuenta 1234'
+    assert 'entities' not in body['message']
 
 
 @pytest.mark.parametrize('metadata', ['forward_origin', 'forward_from', 'forward_date'])

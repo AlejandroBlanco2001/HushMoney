@@ -25,6 +25,7 @@ class BankPatterns:
     currency: str = 'COP'
     thousands_separator: str = '.'
     decimal_separator: str = ','
+    app_names: frozenset[str] = frozenset()
 
 
 # Accepts both Colombian ($6.930,00) and US ($1,000.00) number formats.

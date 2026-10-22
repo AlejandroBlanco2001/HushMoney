@@ -22,12 +22,16 @@ from starlette.responses import Response
 from starlette.routing import Route
 
 from forwarder import hermes
-from forwarder.sanitizer import sanitize
+from forwarder.sanitizer import sanitize, sanitize_push
 
 
 log = logging.getLogger(__name__)
 MAX_BODY_BYTES = 64 * 1024
 COMMANDS = frozenset({'/start', '/help', '/status', '/new', '/stop'})
+
+# Matches "AppName: message body" — app name is a single non-whitespace word starting
+# with a letter, which is the typical format for mobile push notifications.
+_PUSH_RE = re.compile(r'^([A-Za-z]\S*):\s*(.+)', re.DOTALL)
 
 
 @dataclass(frozen=True)
@@ -166,6 +170,20 @@ def _build_message(update: object, chat_id: int) -> Message | None:
     )
 
 
+def _build_plain_update(message: Message, chat_id: int) -> dict[str, object]:
+    """Minimal update forwarded to Hermes for skill routing (e.g. bank_learning)."""
+    return {
+        'update_id': message['update_id'],
+        'message': {
+            'message_id': message['message_id'],
+            'date': message['date'],
+            'chat': {'id': chat_id, 'type': 'private'},
+            'from': {'id': chat_id, 'is_bot': False, 'first_name': 'User'},
+            'text': message['text'],
+        },
+    }
+
+
 def _build_command_update(message: Message, chat_id: int) -> dict[str, object]:
     # Rebuild the update so names, quoted messages and other raw metadata never reach Hermes.
     return {
@@ -193,14 +211,43 @@ async def route_update(update: object, cfg: TelegramConfig, client: httpx.AsyncC
             {'X-Telegram-Bot-Api-Secret-Token': cfg.webhook_secret},
         )
         return
+
+    # Regular SMS
     payload = sanitize(message['text'], channel='sms')
-    if payload is None:
-        log.info('pattern not matched, telegram message dropped')
+    if payload is not None:
+        try:
+            await hermes.dispatch_async(payload, cfg.gateway_url, cfg.gateway_secret, client)
+        except httpx.HTTPError:
+            log.warning('telegram dispatch failed, message dropped')
         return
-    try:
-        await hermes.dispatch_async(payload, cfg.gateway_url, cfg.gateway_secret, client)
-    except httpx.HTTPError:
-        log.warning('telegram dispatch failed, message dropped')
+
+    # Push notification (App:Message) — try app-based bank lookup
+    m = _PUSH_RE.match(message['text'])
+    if m:
+        app_name, body = m.group(1), m.group(2)
+        push_payload, bank_found = sanitize_push(app_name, body, channel='sms')
+        if bank_found:
+            if push_payload is not None:
+                try:
+                    await hermes.dispatch_async(
+                        push_payload, cfg.gateway_url, cfg.gateway_secret, client
+                    )
+                except httpx.HTTPError:
+                    log.warning('telegram push dispatch failed, message dropped')
+            else:
+                log.info('push app %r matched but message did not parse, dropped', app_name)
+            return
+        # App not in known banks — let bank_learning handle it
+        log.info('push from unknown app %r, forwarding to bank_learning', app_name)
+        await _post_json(
+            client,
+            cfg.hermes_webhook_url,
+            _build_plain_update(message, cfg.chat_id),
+            {'X-Telegram-Bot-Api-Secret-Token': cfg.webhook_secret},
+        )
+        return
+
+    log.info('pattern not matched, telegram message dropped')
 
 
 async def _post_json(
