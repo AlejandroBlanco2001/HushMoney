@@ -3,21 +3,21 @@ title: Bank Setup
 description: Configure your bank email notifications for automatic capture.
 ---
 
-HushMoney captures transactions from bank email notifications via IMAP polling. No webhook, no domain, no third-party routing required — the forwarder polls your Gmail inbox directly every 5 minutes.
+HushMoney captures transactions from bank email notifications by polling your inbox via IMAP. The forwarder connects directly to your email account every 5 minutes — no webhooks, no third-party routing, no domain required.
 
 ## Step 1 — Enable bank email alerts
 
-In your bank's app or website, enable transaction notifications via email. Look for settings like:
+In your bank's app or website, enable transaction notifications via email. Look for:
 
-- "Email alerts"
-- "Transaction notifications"
-- "Spending alerts"
+- "Email alerts" / "Email notifications"
+- "Transaction alerts"
+- "Spending notifications"
 
-Enable alerts for: purchases, transfers, cash withdrawals, and any other transaction types you want to track.
+Enable alerts for purchases, transfers, cash withdrawals, and any other transaction types you want to track.
 
 ## Step 2 — Note the sender address
 
-Check one of the notification emails your bank sends and copy the exact **From** address — it usually looks like `alerts@yourbank.com` or `no-reply@notifications.bank.com`.
+Check one of the notification emails your bank sends and copy the exact **From** address. It usually looks like `alerts@yourbank.com` or `no-reply@notifications.bank.com`.
 
 Add it to `.env`:
 
@@ -25,29 +25,80 @@ Add it to `.env`:
 BANK_SENDER_EMAILS=alerts@bancolombia.com.co
 ```
 
-For multiple banks, comma-separate:
+For multiple banks:
 
 ```bash
 BANK_SENDER_EMAILS=alerts@bancolombia.com.co,no-reply@nequi.com,notificaciones@davivienda.com
 ```
 
-## Step 3 — Gmail App Password
+## Step 3 — Choose a compatible email provider
 
-The forwarder authenticates to Gmail using an App Password (regular passwords are blocked by Google for IMAP).
+The forwarder authenticates via IMAP using an app password. Use any provider from the list below — forward your bank notifications there if they go to a different address.
 
-1. Enable IMAP: Gmail Settings → **Forwarding and POP/IMAP** → Enable IMAP
-2. Generate App Password: [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) → name it "hushmoney"
-3. Copy the 16-character password (no spaces) into `IMAP_PASSWORD`
+<AccordionGroup>
+  <Accordion title="Gmail (recommended)">
+    1. Enable IMAP: Gmail Settings → **Forwarding and POP/IMAP** → Enable IMAP
+    2. Generate an App Password: [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) → name it "hushmoney"
+    3. Copy the 16-character password (no spaces)
 
-## Outlook users
+    ```bash
+    IMAP_HOST=imap.gmail.com
+    IMAP_PORT=993
+    IMAP_USERNAME=you@gmail.com
+    IMAP_PASSWORD=abcd efgh ijkl mnop   # paste as-is, spaces ignored
+    ```
 
-If your bank sends alerts to an Outlook address:
+    <Note>Google requires 2-Step Verification to be enabled before you can create App Passwords.</Note>
+  </Accordion>
+  <Accordion title="Yahoo Mail">
+    1. Go to [Account Security](https://login.yahoo.com/account/security) → **Generate app password**
+    2. Select "Other app" → name it "hushmoney" → copy the password
 
-1. In Outlook, create a rule: **Forward** emails from your bank's sender address to your Gmail
-2. In `.env`, set `BANK_SENDER_EMAILS` to the **original bank sender address** (Outlook preserves it in headers)
-3. Set `IMAP_USERNAME` and `IMAP_PASSWORD` to your Gmail credentials
+    ```bash
+    IMAP_HOST=imap.mail.yahoo.com
+    IMAP_PORT=993
+    IMAP_USERNAME=you@yahoo.com
+    IMAP_PASSWORD=your-app-password
+    ```
+  </Accordion>
+  <Accordion title="iCloud Mail">
+    1. Go to [appleid.apple.com](https://appleid.apple.com) → Sign-In and Security → **App-Specific Passwords**
+    2. Generate a password → name it "hushmoney"
 
-The forwarder automatically recovers the original bank sender from `X-Original-From` and `X-Forwarded-From` headers that Outlook adds during forwarding.
+    ```bash
+    IMAP_HOST=imap.mail.me.com
+    IMAP_PORT=993
+    IMAP_USERNAME=you@icloud.com
+    IMAP_PASSWORD=your-app-specific-password
+    ```
+  </Accordion>
+  <Accordion title="Fastmail">
+    1. Go to Settings → Privacy & Security → **App Passwords** → New App Password
+    2. Name it "hushmoney" → copy the password
+
+    ```bash
+    IMAP_HOST=imap.fastmail.com
+    IMAP_PORT=993
+    IMAP_USERNAME=you@fastmail.com
+    IMAP_PASSWORD=your-app-password
+    ```
+  </Accordion>
+  <Accordion title="Zoho Mail">
+    1. Go to Zoho Account → Security → **App Passwords** → Generate
+    2. Name it "hushmoney" → copy the password
+
+    ```bash
+    IMAP_HOST=imap.zoho.com
+    IMAP_PORT=993
+    IMAP_USERNAME=you@zohomail.com
+    IMAP_PASSWORD=your-app-password
+    ```
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  Providers that require OAuth (Microsoft 365, Outlook.com, Hotmail) are not supported — they do not allow IMAP authentication with a simple password or app password.
+</Warning>
 
 ## Supported banks
 
@@ -58,19 +109,20 @@ The forwarder ships with pre-built parsing patterns for:
 | Bancolombia | Colombia | Email, SMS |
 | Nequi | Colombia | SMS |
 
-For banks not on this list, use the [Bank Learning](/skills/bank-learning) skill to teach Hermes new formats interactively.
+For banks not on this list, use the [Bank Learning](/skills/bank-learning) skill to teach Hermes new formats interactively — no code required.
 
-## Testing your setup
+## Verify your setup
 
-With the stack running, check the forwarder logs to confirm it's polling and finding emails:
+With the stack running:
 
 ```bash
-docker logs -f forwarder
+docker compose logs -f forwarder
 ```
 
-You should see lines like:
+You should see polling lines like:
+
 ```
 [forwarder] polling INBOX for alerts@bancolombia.com.co...
 [forwarder] 1 unseen message(s) found
-[forwarder] dispatched to hermes: {"amount": 45000, "merchant": "RAPPI", ...}
+[forwarder] dispatched: {"amount": 45000, "merchant": "RAPPI", ...}
 ```

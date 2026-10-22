@@ -1,23 +1,18 @@
 ---
-title: Quickstart (EC2)
-description: Deploy HushMoney to an AWS EC2 instance in one command.
+title: Quickstart
+description: Run HushMoney anywhere Docker is available — your laptop, a VPS, or any cloud instance.
 ---
+
+HushMoney runs as a Docker Compose stack. If Docker is installed, it runs. No cloud account required.
 
 ## Prerequisites
 
-Before running the setup script, you need:
-
 <AccordionGroup>
-  <Accordion title="AWS EC2 instance">
-    1. Open the [AWS EC2 console](https://console.aws.amazon.com/ec2/)
-    2. Launch instance → **Amazon Linux 2023 AMI**
-    3. Instance type: **t3.small** (recommended) or t2.micro (free tier)
-    4. Key pair: create a new one (`hushmoney`), download the `.pem` file
-    5. Security group: allow inbound SSH (port 22) from your IP
-    6. Launch, then attach an **Elastic IP** so the address stays stable across restarts
+  <Accordion title="Docker">
+    Install [Docker Desktop](https://docs.docker.com/get-docker/) (Mac/Windows) or Docker Engine (Linux). Docker Compose v2 is included.
   </Accordion>
   <Accordion title="Telegram bot">
-    1. Open Telegram and message [@BotFather](https://t.me/BotFather)
+    1. Message [@BotFather](https://t.me/BotFather) on Telegram
     2. Send `/newbot` and follow the prompts
     3. Copy the bot token — it looks like `123456789:ABCdef...`
     4. Get your personal chat ID by messaging [@userinfobot](https://t.me/userinfobot)
@@ -25,16 +20,12 @@ Before running the setup script, you need:
   <Accordion title="Nebius API key">
     Sign up at [nebius.ai](https://nebius.ai), create a project, and generate an API key from the **Token Factory** section.
   </Accordion>
-  <Accordion title="Gmail App Password">
-    1. Enable IMAP: Gmail Settings → Forwarding and POP/IMAP → **Enable IMAP**
-    2. Generate App Password: [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) → name it "hushmoney"
-    3. Copy the 16-character password (no spaces)
-
-    <Note>Outlook users: set up a forwarding rule to send bank emails to Gmail, then use your Gmail address and App Password here.</Note>
+  <Accordion title="Email account with IMAP">
+    You need an email account that receives your bank notifications and supports IMAP with an app password. See [Bank Setup](/configuration/bank-setup) for compatible providers.
   </Accordion>
 </AccordionGroup>
 
-## Setup
+## Deploy
 
 <Steps>
   <Step title="Clone the repo">
@@ -47,23 +38,34 @@ Before running the setup script, you need:
     ```bash
     cp .env.example .env
     ```
-    Fill in the required values — see the [Environment Variables](/configuration/environment-variables) reference for the full list.
-  </Step>
-  <Step title="Run setup">
+    Fill in the required values. See [Environment Variables](/configuration/environment-variables) for the full reference.
+
+    The minimum required set to get started:
     ```bash
-    ./scripts/setup.sh
+    NEBIUS_API_KEY=...
+    TELEGRAM_BOT_TOKEN=...
+    TELEGRAM_CHAT_ID=...
+    IMAP_HOST=imap.gmail.com
+    IMAP_USERNAME=you@gmail.com
+    IMAP_PASSWORD=your-app-password
+    BANK_SENDER_EMAILS=alerts@yourbank.com
+    HERMES_GATEWAY_SECRET=any-random-string
+    ```
+  </Step>
+  <Step title="Start the stack">
+    ```bash
+    docker compose up -d
     ```
 
-    On first run, the script will:
-    - Install Docker and Docker Compose on the EC2 instance
-    - Clone the repo to `/home/ec2-user/hushmoney`
-    - Push your secrets as a remote `.env`
-    - Start the full stack via `docker compose up -d`
+    This starts three containers:
+    - `hermes` — the AI agent
+    - `forwarder` — email poller and sanitizer
+    - `sms-listener` — Telegram SMS intake (optional, see [iPhone SMS](/configuration/iphone-sms))
 
-    Subsequent runs just push updated secrets and restart the stack.
+    All containers restart automatically on reboot (`restart: unless-stopped`).
   </Step>
   <Step title="Verify">
-    Open Telegram, find your bot by username, and send `/start`. Then send `/status` — Hermes should reply with agent health and the last transaction it saw.
+    Open Telegram, find your bot by username, and send `/start`. Then send `/status` — Hermes should reply confirming it's running.
   </Step>
 </Steps>
 
@@ -75,37 +77,35 @@ To pre-populate the database with 3 months of realistic fake transactions:
 ./scripts/seed_demo.sh
 ```
 
-This seeds Bancolombia checking, Bancolombia credit, and Nequi accounts with salary credits, groceries, transport, subscriptions, and sample debts. Useful for demos and judging.
+Seeds salary credits, groceries, transport, subscriptions, and sample debts across three accounts. Useful for trying the bot before your bank notifications arrive.
 
-## Useful commands
+## Keep it running
+
+The stack manages its own uptime — containers restart automatically after crashes or reboots. To check status at any time:
 
 ```bash
-# Tail logs on EC2
-ssh -i ~/.ssh/hushmoney.pem ec2-user@<EC2_HOST> \
-  'cd hushmoney && docker compose logs -f'
+docker compose ps
+docker compose logs -f
+```
 
-# Redeploy after a git push
-ssh -i ~/.ssh/hushmoney.pem ec2-user@<EC2_HOST> \
-  'cd hushmoney && git pull && docker compose up -d --build'
+To update to the latest version:
 
-# Rotate Nebius API key
-./scripts/setup.sh --rotate-key
+```bash
+git pull && docker compose up -d --build
 ```
 
 ## Troubleshooting
 
 <AccordionGroup>
-  <Accordion title="Permission denied (publickey) when running setup.sh">
-    - Confirm `EC2_KEY_FILE` in `.env` points to the correct `.pem` file
-    - Run `chmod 400 ~/.ssh/hushmoney.pem`
-    - Check that the EC2 security group allows SSH from your current IP
-  </Accordion>
   <Accordion title="Forwarder not picking up emails">
-    - `BANK_SENDER_EMAILS` must match the exact sender address in your bank's emails
-    - Confirm IMAP is enabled in Gmail settings
-    - SSH into EC2 and run `docker compose logs forwarder` to see poll output
+    - `BANK_SENDER_EMAILS` must exactly match the sender address in your bank's emails
+    - Confirm IMAP is enabled on your email account
+    - Run `docker compose logs forwarder` to see what's happening
   </Accordion>
   <Accordion title="Telegram: Chat not found">
-    The bot has never received a message from your account. Open Telegram, find your bot, and send `/start` to open the chat.
+    The bot has never received a message from you. Open Telegram, find your bot by username, and send `/start` to open the chat.
+  </Accordion>
+  <Accordion title="Hermes container keeps restarting">
+    Check that `NEBIUS_API_KEY` and `HERMES_GATEWAY_SECRET` are set correctly in `.env`, then run `docker compose logs hermes`.
   </Accordion>
 </AccordionGroup>
