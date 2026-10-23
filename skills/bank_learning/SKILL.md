@@ -49,6 +49,7 @@ Bancolombia: Su cuenta *1234 fue debitada por $[REDACTED]. Compra en [REDACTED].
 - `no_template` — bank recognized but no matching pattern
 - `date_failed` — pattern matched but date extraction failed
 - `invalid_amount` — pattern matched but amount could not be parsed
+- `pending_repeat` — same unknown pattern seen again while a previous learning request is still open; **skip pattern teaching, go straight to Step 3** (ask for amount + date to record this specific transaction manually via expense_tracker)
 
 ## Procedure
 
