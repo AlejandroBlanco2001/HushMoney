@@ -23,7 +23,11 @@ jobs:
             ! -path "*/model_selection/*" \
             | sort | while read script; do
               echo "::group::$script"
-              python "$script"
+              if [[ "$script" == */run.py ]]; then
+                python "$script" --model super
+              else
+                python "$script"
+              fi
               echo "::endgroup::"
             done
 
