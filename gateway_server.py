@@ -22,10 +22,12 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 HERMES_BIN = "/root/.local/bin/hermes"
 DB_PATH = os.getenv("HUSHMONEY_DB", os.path.expanduser("~/.hermes/hushmoney.db"))
 
-_SKILL_BASE = "/root/.hermes/skills/hushmoney"
-_STORE_TX   = f"{_SKILL_BASE}/expense_tracker/scripts/store_transaction.py"
-_LOOKUP_CAT = f"{_SKILL_BASE}/categorizer/scripts/lookup_cached_category.py"
-_SAVE_CAT   = f"{_SKILL_BASE}/categorizer/scripts/save_category.py"
+_SKILL_BASE        = "/root/.hermes/skills/hushmoney"
+_STORE_TX          = f"{_SKILL_BASE}/expense_tracker/scripts/store_transaction.py"
+_LOOKUP_CAT        = f"{_SKILL_BASE}/categorizer/scripts/lookup_cached_category.py"
+_SAVE_CAT          = f"{_SKILL_BASE}/categorizer/scripts/save_category.py"
+_CATEGORIZE        = f"{_SKILL_BASE}/categorizer/scripts/categorize_merchant.py"
+_SAVE_MERCHANT     = f"{_SKILL_BASE}/categorizer/scripts/save_merchant.py"
 
 _NEBIUS_URL = (os.getenv("OPENAI_BASE_URL", "https://api.studio.nebius.ai/v1/").rstrip("/")
                + "/chat/completions")
@@ -49,8 +51,13 @@ async def _run_script(*args: str) -> dict | None:
         return None
 
 
-async def _store_and_categorize(data: dict) -> tuple[str | None, str | None]:
-    """Store transaction and attempt auto-categorization. Returns (tx_id, category)."""
+async def _store_and_categorize(data: dict) -> tuple[str | None, str | None, bool, str | None]:
+    """Store transaction and attempt auto-categorization.
+
+    Returns (tx_id, category, needs_clarification, last_category).
+    needs_clarification=True means the merchant is ambiguous; category will be None
+    and the caller should prompt the user.
+    """
     args = [
         sys.executable, _STORE_TX,
         "--amount",           str(data["amount"]),
@@ -71,22 +78,55 @@ async def _store_and_categorize(data: dict) -> tuple[str | None, str | None]:
     result = await _run_script(*args)
     if not result or result.get("duplicate"):
         log.info("transaction duplicate or storage failed")
-        return None, None
+        return None, None, False, None
 
     tx_id = result.get("id")
     log.info("stored transaction %s", tx_id)
 
-    # Auto-categorize if merchant known
-    category = None
     merchant = data.get("merchant")
-    if tx_id and merchant:
-        cat_result = await _run_script(sys.executable, _LOOKUP_CAT, "--merchant", merchant)
-        if cat_result and cat_result.get("category"):
-            category = cat_result["category"]
-            await _run_script(sys.executable, _SAVE_CAT, "--id", tx_id, "--category", category)
-            log.info("auto-categorized %s → %s", merchant, category)
+    if not tx_id or not merchant:
+        return tx_id, None, False, None
 
-    return tx_id, category
+    # 1. Check merchant cache.
+    lookup = await _run_script(sys.executable, _LOOKUP_CAT, "--merchant", merchant)
+
+    if lookup and lookup.get("found"):
+        if lookup.get("needs_clarification"):
+            log.info("merchant %s flagged needs_clarification", merchant)
+            return tx_id, None, True, lookup.get("last_category")
+        category = lookup.get("category")
+        if category:
+            await _run_script(sys.executable, _SAVE_CAT, "--id", tx_id, "--category", category)
+            log.info("cache hit %s → %s", merchant, category)
+            return tx_id, category, False, None
+
+    # 2. Cache miss — call LLM.
+    log.info("cache miss for %s, calling LLM", merchant)
+    cat_result = await _run_script(
+        sys.executable, _CATEGORIZE,
+        "--merchant", merchant,
+        "--payload", json.dumps(data),
+    )
+
+    if not cat_result:
+        return tx_id, None, False, None
+
+    needs_clarification = cat_result.get("needs_clarification", False)
+    category = cat_result.get("category") if not needs_clarification else None
+
+    # Persist merchant so future transactions hit the cache.
+    save_args = [sys.executable, _SAVE_MERCHANT, "--name", merchant]
+    if category:
+        save_args += ["--category", category]
+    if needs_clarification:
+        save_args += ["--needs-clarification"]
+    await _run_script(*save_args)
+
+    if category:
+        await _run_script(sys.executable, _SAVE_CAT, "--id", tx_id, "--category", category)
+        log.info("LLM categorized %s → %s", merchant, category)
+
+    return tx_id, category, needs_clarification, None
 
 
 def _lookup_account_alias(bank: str, account_type: str, currency: str) -> str | None:
@@ -160,7 +200,7 @@ async def gateway(request: Request) -> JSONResponse:
              transaction_type, amount, channel, bank)
 
     # Store and auto-categorize
-    tx_id, category = await _store_and_categorize(data)
+    tx_id, category, needs_clarification, last_category = await _store_and_categorize(data)
 
     # Build notification
     type_label = str(transaction_type).replace("_", " ").title()
@@ -178,6 +218,9 @@ async def gateway(request: Request) -> JSONResponse:
     message = f"💳 *{type_label}*{account_line}{candidate_marker}\n{' | '.join(parts)}"
     if category:
         message += f"\n🏷️ {category.replace('_', ' ').title()}"
+    elif needs_clarification:
+        suggestion = f" (last time: {last_category})" if last_category else ""
+        message += f"\n❓ What was this {merchant} charge for?{suggestion}"
 
     proc = await asyncio.create_subprocess_exec(
         HERMES_BIN, "send", "--to", f"telegram:{TELEGRAM_CHAT_ID}", message,

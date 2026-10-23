@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS transactions (
                                                     -- transfer_in | transfer_out |
                                                     -- payment | top_up
     channel          TEXT NOT NULL,                 -- email | sms | telegram
-    category         TEXT,                          -- set by categorizer skill
+    category         TEXT REFERENCES categories(slug), -- set by categorizer skill
     description      TEXT,                          -- user-provided or inferred
     is_recurring     INTEGER NOT NULL DEFAULT 0,    -- 1 if categorizer flags as subscription
     message_hash     TEXT UNIQUE,                   -- SHA256(amount+date+type+masked_number)
@@ -113,7 +113,40 @@ CREATE TABLE IF NOT EXISTS learned_patterns (
 CREATE INDEX IF NOT EXISTS idx_patterns_bank    ON learned_patterns(bank_slug, country, channel);
 CREATE INDEX IF NOT EXISTS idx_patterns_active  ON learned_patterns(active);
 
--- ── User Settings ──────────────────────────────────────────────────────────
+-- ── Categories ─────────────────────────────────────────────────────────────────
+-- Canonical spending category list. Seeded on first run from default_categories.json.
+-- Users can add/remove via Telegram: "hermes add category gambling".
+
+CREATE TABLE IF NOT EXISTS categories (
+    slug        TEXT PRIMARY KEY,
+    label       TEXT NOT NULL,
+    description TEXT,
+    created_at  TEXT NOT NULL
+);
+
+-- ── Merchants ──────────────────────────────────────────────────────────────────
+-- Merchant → category cache. Populated on first transaction from each merchant
+-- via LLM inference. The cache key is the normalized bank-emitted string
+-- (UPPER + whitespace-collapsed), so "UBER RIDES" and "UBER EATS" are separate
+-- entries — each bank emits a consistent string for the same merchant.
+--
+-- needs_clarification=1: merchant is a payment gateway or multi-service platform
+--   (e.g. RAPPI, PEXTO CAPITAL SAS). Each transaction prompts the user to confirm.
+-- last_category: most recent user-confirmed category for ambiguous merchants,
+--   used to pre-fill the clarification prompt.
+
+CREATE TABLE IF NOT EXISTS merchants (
+    name                TEXT PRIMARY KEY,
+    category            TEXT REFERENCES categories(slug),
+    needs_clarification INTEGER NOT NULL DEFAULT 0,
+    last_category       TEXT REFERENCES categories(slug),
+    created_at          TEXT NOT NULL,
+    updated_at          TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_merchants_category ON merchants(category);
+
+-- ── User Settings ──────────────────────────────────────────────────────────────
 -- Key/value store for user preferences and setup state.
 -- Keys: setup_complete, setup_step, email_provider, imap_host, imap_port,
 --       imap_username, bank_sender_emails, locale, sms_channel_enabled.

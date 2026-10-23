@@ -1,9 +1,11 @@
 """
-Look up the most common category for a merchant from past transactions.
+Look up the category for a merchant from the merchants cache table.
+Falls back to transaction frequency analysis for merchants predating the cache.
 
-Usage: python3 lookup_cached_category.py --merchant "UBER"
-Output: {"category": "transport", "confidence": 0.95, "sample_count": 12}
-        {"category": null}  — if no history or below threshold
+Usage: python3 lookup_cached_category.py --merchant "UBER RIDES"
+Output (cache hit, unambiguous):  {"found": true, "category": "transport", "needs_clarification": false}
+Output (cache hit, ambiguous):    {"found": true, "category": null, "needs_clarification": true, "last_category": "food"}
+Output (cache miss):              {"found": false, "category": null, "needs_clarification": false}
 """
 from __future__ import annotations
 
@@ -13,47 +15,71 @@ import os
 import sqlite3
 
 
-DB_PATH = os.environ.get('HUSHMONEY_DB', os.path.expanduser('~/.hermes/hushmoney.db'))
-MIN_SAMPLES = 1
-MIN_CONFIDENCE = 0.6
+DB_PATH = os.environ.get("HUSHMONEY_DB", os.path.expanduser("~/.hermes/hushmoney.db"))
+
+# Minimum samples / confidence for the transaction-history fallback.
+_MIN_SAMPLES = 3
+_MIN_CONFIDENCE = 0.75
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument('--merchant', required=True)
+    parser.add_argument("--merchant", required=True)
     args = parser.parse_args()
 
+    name = " ".join(args.merchant.split()).upper()
+
     con = sqlite3.connect(DB_PATH)
+
+    # 1. Check dedicated merchants cache first.
+    row = con.execute(
+        "SELECT category, needs_clarification, last_category FROM merchants WHERE name = ?",
+        (name,),
+    ).fetchone()
+
+    if row is not None:
+        con.close()
+        category, needs_clarification, last_category = row
+        print(json.dumps({
+            "found": True,
+            "category": category,
+            "needs_clarification": bool(needs_clarification),
+            "last_category": last_category,
+        }))
+        return
+
+    # 2. Fallback: frequency analysis on past transactions (for rows predating the cache).
     rows = con.execute(
         """
         SELECT category, COUNT(*) AS cnt
         FROM transactions
-        WHERE UPPER(merchant) = UPPER(?) AND category IS NOT NULL
+        WHERE UPPER(merchant) = ? AND category IS NOT NULL
         GROUP BY category
         ORDER BY cnt DESC
         """,
-        (args.merchant,),
+        (name,),
     ).fetchall()
     con.close()
 
     if not rows:
-        print(json.dumps({"category": None}))
+        print(json.dumps({"found": False, "category": None, "needs_clarification": False}))
         return
 
     top_category, top_count = rows[0]
     total = sum(r[1] for r in rows)
     confidence = top_count / total
 
-    if top_count < MIN_SAMPLES or confidence < MIN_CONFIDENCE:
-        print(json.dumps({"category": None}))
+    if top_count < _MIN_SAMPLES or confidence < _MIN_CONFIDENCE:
+        print(json.dumps({"found": False, "category": None, "needs_clarification": False}))
         return
 
     print(json.dumps({
+        "found": True,
         "category": top_category,
-        "confidence": round(confidence, 2),
-        "sample_count": total,
+        "needs_clarification": False,
+        "last_category": None,
     }))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

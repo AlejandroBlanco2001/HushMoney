@@ -21,95 +21,25 @@ from __future__ import annotations
 
 import json
 import os
-import ssl
 import sys
 import time
 import urllib.error
-import urllib.request
 from pathlib import Path
 from typing import Any
 
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from lib import api, models as _models
 
-def _load_dotenv(path: Path) -> None:
-    if not path.exists():
-        return
-    for line in path.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
-            os.environ[key] = value
-
-
-def _ssl_context() -> ssl.SSLContext:
-    ctx = ssl.create_default_context()
-    # create_default_context() sets OpenSSL search paths but doesn't explicitly
-    # load the cert file — do it manually so verification actually works
-    for candidate in [
-        os.environ.get("NIX_SSL_CERT_FILE", ""),
-        os.environ.get("SSL_CERT_FILE", ""),
-        "/etc/ssl/certs/ca-certificates.crt",
-        "/etc/ssl/certs/ca-bundle.crt",
-    ]:
-        if candidate and Path(candidate).exists():
-            ctx.load_verify_locations(cafile=candidate)
-            break
-    return ctx
-
-
-# ── Config ─────────────────────────────────────────────────────────────────────
-
-REPO_ROOT = Path(__file__).parent.parent.parent
+REPO_ROOT = _models.REPO_ROOT
 RESULTS_FILE = Path(__file__).parent / "results.json"
-API_BASE = "https://api.studio.nebius.com/v1"
-
-MODELS: list[dict[str, Any]] = [
-    {
-        "key": "nano",
-        "id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
-        "label": "Nano  (30B / 3B active)",
-        "input_per_m": 0.06,
-        "output_per_m": 0.24,
-    },
-    {
-        "key": "super",
-        "id": "nvidia/nemotron-3-super-120b-a12b",
-        "label": "Super (120B / 12B active)",
-        "input_per_m": 0.30,
-        "output_per_m": 0.90,
-    },
-    {
-        "key": "ultra",
-        "id": "nvidia/Nemotron-3-Ultra-550b-a55b",
-        "label": "Ultra (550B / 55B active)",
-        "input_per_m": 1.00,
-        "output_per_m": 3.00,
-    },
-]
+MODELS = _models.MODELS
 
 # Default category set shipped with the app — user can add/remove via Telegram.
 # In production the categorizer skill reads this list from SQLite at call time.
 STARTER_CATEGORIES = [
-    "dining",
-    "groceries",
-    "food_delivery",
-    "transport",
-    "fuel",
-    "shopping",
-    "entertainment",
-    "subscriptions",
-    "utilities",
-    "health",
-    "fitness",
-    "travel",
-    "accommodation",
-    "transfer",
-    "cash",
-    "services",
-    "other",
+    "dining", "groceries", "food_delivery", "transport", "fuel", "shopping",
+    "entertainment", "subscriptions", "utilities", "health", "fitness",
+    "travel", "accommodation", "transfer", "cash", "services", "other",
 ]
 
 
@@ -152,62 +82,19 @@ def discover_fixtures() -> list[dict[str, Any]]:
     for path in sorted(root.rglob("*.expected.json")):
         rel = path.relative_to(root)
         key = str(rel).replace(".expected.json", "")
-
         with path.open() as f:
             payload = json.load(f)
-
-        cases.append(
-            {
-                "fixture": key,
-                "input": payload,
-                "correct_category": None,  # fill in manually after running
-                "models": {},
-            }
-        )
+        cases.append({
+            "fixture": key,
+            "input": payload,
+            "correct_category": None,  # fill in manually after running
+            "models": {},
+        })
 
     return cases
 
 
 # ── API ────────────────────────────────────────────────────────────────────────
-
-
-def _extract_result(text: str) -> dict[str, str]:
-    """Pull category (and optional reason) from a model response.
-
-    Returns {"category": ..., "reason": ...} — reason is empty string when absent.
-    Handles reasoning models that prepend a monologue before the JSON.
-    """
-    import re
-
-    def _parse(obj: dict[str, Any]) -> dict[str, str]:
-        return {
-            "category": str(obj.get("category", "unknown")).lower().strip(),
-            "reason": str(obj.get("reason", "")),
-        }
-
-    # Happy path: entire response is valid JSON
-    try:
-        return _parse(json.loads(text))
-    except (json.JSONDecodeError, AttributeError):
-        pass
-
-    # Reasoning model: find the last {...} block that contains "category"
-    matches = re.findall(r'\{[^{}]*"category"\s*:[^{}]*\}', text)
-    if matches:
-        try:
-            return _parse(json.loads(matches[-1]))
-        except json.JSONDecodeError:
-            cat_match = re.search(r'"category"\s*:\s*"([^"]+)"', matches[-1])
-            if cat_match:
-                return {"category": cat_match.group(1).lower().strip(), "reason": ""}
-
-    # Last resort: scan for any known category word in the full text
-    all_categories = STARTER_CATEGORIES + ["needs_clarification"]
-    for cat in all_categories:
-        if re.search(rf"\b{re.escape(cat)}\b", text, re.IGNORECASE):
-            return {"category": cat, "reason": ""}
-
-    return {"category": "unknown", "reason": ""}
 
 
 def call_model(
@@ -216,47 +103,21 @@ def call_model(
     payload: dict[str, Any],
     categories: list[str] = STARTER_CATEGORIES,
 ) -> dict[str, Any]:
-    body = json.dumps(
-        {
-            "model": model_id,
-            "messages": [
-                {"role": "system", "content": make_system_prompt(categories)},
-                {"role": "user", "content": json.dumps(payload)},
-            ],
-            "temperature": 0,
-            "max_tokens": 256,  # enough for reasoning models that prepend thought text
-        }
-    ).encode()
-
-    req = urllib.request.Request(
-        f"{API_BASE}/chat/completions",
-        data=body,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-        },
-        method="POST",
+    resp = api.chat_completion(
+        api_key, model_id,
+        messages=[
+            {"role": "system", "content": make_system_prompt(categories)},
+            {"role": "user", "content": json.dumps(payload)},
+        ],
+        max_tokens=256,
     )
-
-    t0 = time.perf_counter()
-    with urllib.request.urlopen(req, timeout=30, context=_ssl_context()) as resp:
-        latency_ms = round((time.perf_counter() - t0) * 1000)
-        data = json.loads(resp.read())
-
-    message = data["choices"][0]["message"]
-    # content can be None when the model uses a refusal field or reasoning_content
-    content = message.get("content") or message.get("reasoning_content") or ""
-    content = content.strip()
-    usage = data.get("usage", {})
-
-    result = _extract_result(content)
-
+    result = api.extract_json(resp["content"], valid_values=categories + ["needs_clarification"])
     return {
-        "category": result["category"],
-        "reason": result["reason"],
-        "latency_ms": latency_ms,
-        "input_tokens": usage.get("prompt_tokens", 0),
-        "output_tokens": usage.get("completion_tokens", 0),
+        "category": str(result.get("category") or result.get("_scanned") or "unknown").lower().strip(),
+        "reason": str(result.get("reason", "")),
+        "latency_ms": resp["latency_ms"],
+        "input_tokens": resp["input_tokens"],
+        "output_tokens": resp["output_tokens"],
         "error": None,
     }
 
@@ -268,7 +129,7 @@ def run_experiment(dry_run: bool = False) -> None:
     if dry_run:
         print("[dry-run: fixture discovery only, no API calls]\n")
     else:
-        _load_dotenv(REPO_ROOT / ".env")
+        api.load_dotenv()
         api_key = os.environ.get("NEBIUS_API_KEY", "")
         if not api_key:
             print("ERROR: NEBIUS_API_KEY not set", file=sys.stderr)
@@ -301,26 +162,18 @@ def run_experiment(dry_run: bool = False) -> None:
             except urllib.error.HTTPError as e:
                 err = f"HTTP {e.code}: {e.reason}"
                 case["models"][model["key"]] = {
-                    "category": None,
-                    "reason": "",
-                    "latency_ms": None,
-                    "input_tokens": 0,
-                    "output_tokens": 0,
-                    "error": err,
+                    "category": None, "reason": "", "latency_ms": None,
+                    "input_tokens": 0, "output_tokens": 0, "error": err,
                 }
                 print(f"    [{model['key']:5}] ERROR: {err}")
             except Exception as e:
                 case["models"][model["key"]] = {
-                    "category": None,
-                    "reason": "",
-                    "latency_ms": None,
-                    "input_tokens": 0,
-                    "output_tokens": 0,
-                    "error": str(e),
+                    "category": None, "reason": "", "latency_ms": None,
+                    "input_tokens": 0, "output_tokens": 0, "error": str(e),
                 }
                 print(f"    [{model['key']:5}] ERROR: {e}")
 
-            time.sleep(0.25)  # avoid hammering the endpoint between models
+            time.sleep(0.25)
 
         print()
 
@@ -335,9 +188,7 @@ def run_experiment(dry_run: bool = False) -> None:
         print('  2. Fill in "correct_category" for each fixture')
         print("  3. Run:  python evals/model_selection/run.py --score")
         print()
-        print(
-            "Tip: the labeled file is the seed for skills/categorizer/evals/golden.jsonl"
-        )
+        print("Tip: the labeled file is the seed for skills/categorizer/evals/golden.jsonl")
 
 
 # ── Score ──────────────────────────────────────────────────────────────────────
@@ -353,62 +204,34 @@ def score() -> None:
 
     labeled = [c for c in cases if c.get("correct_category")]
     if not labeled:
-        print(
-            "No labeled cases yet — fill in 'correct_category' in results.json first."
-        )
+        print("No labeled cases yet — fill in 'correct_category' in results.json first.")
         sys.exit(0)
 
     print(f"\n{'=' * 76}")
-    print(
-        f"HERMES MODEL SELECTION  ({len(labeled)} labeled / {len(cases)} total fixtures)"
-    )
+    print(f"HERMES MODEL SELECTION  ({len(labeled)} labeled / {len(cases)} total fixtures)")
     print(f"{'=' * 76}\n")
-
-    print(
-        f"  {'Model':<28} {'Acc':>5}  {'Avg latency':>11}  {'Tokens in/out':>14}  {'$/1K calls':>10}"
-    )
+    print(f"  {'Model':<28} {'Acc':>5}  {'Avg latency':>11}  {'Tokens in/out':>14}  {'$/1K calls':>10}")
     print(f"  {'-' * 74}")
 
     for model in MODELS:
         key = model["key"]
-        model_cases = [
-            c
-            for c in labeled
-            if key in c["models"] and not c["models"][key].get("error")
-        ]
+        model_cases = [c for c in labeled if key in c["models"] and not c["models"][key].get("error")]
 
         if not model_cases:
             print(f"  {model['label']:<28}  no data")
             continue
 
-        correct = sum(
-            1
-            for c in model_cases
-            if c["models"][key]["category"] == c["correct_category"]
-        )
+        correct = sum(1 for c in model_cases if c["models"][key]["category"] == c["correct_category"])
         accuracy = correct / len(model_cases)
-
-        latencies = [
-            c["models"][key]["latency_ms"]
-            for c in model_cases
-            if c["models"][key]["latency_ms"]
-        ]
+        latencies = [c["models"][key]["latency_ms"] for c in model_cases if c["models"][key]["latency_ms"]]
         avg_latency = sum(latencies) / len(latencies) if latencies else 0
-
-        avg_in = sum(c["models"][key]["input_tokens"] for c in model_cases) / len(
-            model_cases
-        )
-        avg_out = sum(c["models"][key]["output_tokens"] for c in model_cases) / len(
-            model_cases
-        )
-
-        cost_per_call = (avg_in / 1_000_000) * model["input_per_m"] + (
-            avg_out / 1_000_000
-        ) * model["output_per_m"]
+        avg_in = sum(c["models"][key]["input_tokens"] for c in model_cases) / len(model_cases)
+        avg_out = sum(c["models"][key]["output_tokens"] for c in model_cases) / len(model_cases)
+        cost = (avg_in / 1_000_000) * model["input_per_m"] + (avg_out / 1_000_000) * model["output_per_m"]
 
         print(
             f"  {model['label']:<28} {accuracy:>5.1%}  {avg_latency:>9.0f}ms  "
-            f"{avg_in:>6.0f}/{avg_out:<7.0f}  ${cost_per_call * 1000:.4f}"
+            f"{avg_in:>6.0f}/{avg_out:<7.0f}  ${cost * 1000:.4f}"
         )
 
     print()

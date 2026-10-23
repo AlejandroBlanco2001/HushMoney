@@ -28,67 +28,18 @@ from __future__ import annotations
 
 import json
 import os
-import re
-import ssl
 import sys
 import time
-import urllib.error
-import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from lib import api, models as _models
 
-# ── Shared setup (mirrors run.py) ──────────────────────────────────────────────
-
-REPO_ROOT = Path(__file__).parent.parent.parent
+REPO_ROOT = _models.REPO_ROOT
 RESULTS_FILE = Path(__file__).parent / "bank_learning_results.json"
-API_BASE = "https://api.studio.nebius.com/v1"
-
-MODELS: list[dict[str, Any]] = [
-    {
-        "key": "nano",
-        "id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
-        "label": "Nano  (30B / 3B active)",
-        "input_per_m": 0.06,
-        "output_per_m": 0.24,
-    },
-    {
-        "key": "super",
-        "id": "nvidia/nemotron-3-super-120b-a12b",
-        "label": "Super (120B / 12B active)",
-        "input_per_m": 0.30,
-        "output_per_m": 0.90,
-    },
-]
-
-
-def _load_dotenv(path: Path) -> None:
-    if not path.exists():
-        return
-    for line in path.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
-            os.environ[key] = value
-
-
-def _ssl_context() -> ssl.SSLContext:
-    ctx = ssl.create_default_context()
-    for candidate in [
-        os.environ.get("NIX_SSL_CERT_FILE", ""),
-        os.environ.get("SSL_CERT_FILE", ""),
-        "/etc/ssl/certs/ca-certificates.crt",
-        "/etc/ssl/certs/ca-bundle.crt",
-    ]:
-        if candidate and Path(candidate).exists():
-            ctx.load_verify_locations(cafile=candidate)
-            break
-    return ctx
+MODELS = _models.MODELS
 
 
 # ── Prompt ─────────────────────────────────────────────────────────────────────
@@ -312,21 +263,6 @@ def score_response(
     return correct, len(checks), misses
 
 
-def _extract_json(text: str) -> dict[str, Any]:
-    try:
-        return dict(json.loads(text))
-    except (json.JSONDecodeError, TypeError):
-        pass
-    # dig out the last {...} block from a reasoning monologue
-    blocks = re.findall(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)?\}", text, re.DOTALL)
-    for block in reversed(blocks):
-        try:
-            return dict(json.loads(block))
-        except (json.JSONDecodeError, TypeError):
-            continue
-    return {}
-
-
 # ── API ────────────────────────────────────────────────────────────────────────
 
 
@@ -336,51 +272,23 @@ def call_model(
     message: str,
     locale: str | None = None,
 ) -> tuple[dict[str, Any], int, int, int]:
-    body = json.dumps(
-        {
-            "model": model_id,
-            "messages": [
-                {"role": "system", "content": make_system_prompt(locale)},
-                {"role": "user", "content": message},
-            ],
-            "temperature": 0,
-            "max_tokens": 2048,
-        }
-    ).encode()
-
-    req = urllib.request.Request(
-        f"{API_BASE}/chat/completions",
-        data=body,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-        },
-        method="POST",
+    resp = api.chat_completion(
+        api_key, model_id,
+        messages=[
+            {"role": "system", "content": make_system_prompt(locale)},
+            {"role": "user", "content": message},
+        ],
+        max_tokens=2048,
     )
-
-    t0 = time.perf_counter()
-    with urllib.request.urlopen(req, timeout=30, context=_ssl_context()) as resp:
-        latency_ms = round((time.perf_counter() - t0) * 1000)
-        data = json.loads(resp.read())
-
-    msg = data["choices"][0]["message"]
-    content = msg.get("content") or msg.get("reasoning_content") or ""
-    usage = data.get("usage", {})
-
-    parsed = _extract_json(content.strip())
-    return (
-        parsed,
-        latency_ms,
-        usage.get("prompt_tokens", 0),
-        usage.get("completion_tokens", 0),
-    )
+    parsed = api.extract_json(resp["content"])
+    return parsed, resp["latency_ms"], resp["input_tokens"], resp["output_tokens"]
 
 
 # ── Runner ─────────────────────────────────────────────────────────────────────
 
 
 def run() -> None:
-    _load_dotenv(REPO_ROOT / ".env")
+    api.load_dotenv()
     api_key = os.environ.get("NEBIUS_API_KEY", "")
     if not api_key:
         print("ERROR: NEBIUS_API_KEY not set", file=sys.stderr)
