@@ -28,6 +28,8 @@ _LOOKUP_CAT        = f"{_SKILL_BASE}/categorizer/scripts/lookup_cached_category.
 _SAVE_CAT          = f"{_SKILL_BASE}/categorizer/scripts/save_category.py"
 _CATEGORIZE        = f"{_SKILL_BASE}/categorizer/scripts/categorize_merchant.py"
 _SAVE_MERCHANT     = f"{_SKILL_BASE}/categorizer/scripts/save_merchant.py"
+_DETECT_RECURRING  = f"{_SKILL_BASE}/categorizer/scripts/detect_recurring.py"
+_MARK_RECURRING    = f"{_SKILL_BASE}/categorizer/scripts/mark_recurring.py"
 
 _NEBIUS_URL = (os.getenv("OPENAI_BASE_URL", "https://api.studio.nebius.ai/v1/").rstrip("/")
                + "/chat/completions")
@@ -51,10 +53,10 @@ async def _run_script(*args: str) -> dict | None:
         return None
 
 
-async def _store_and_categorize(data: dict) -> tuple[str | None, str | None, bool, str | None]:
+async def _store_and_categorize(data: dict) -> tuple[str | None, str | None, bool, str | None, bool]:
     """Store transaction and attempt auto-categorization.
 
-    Returns (tx_id, category, needs_clarification, last_category).
+    Returns (tx_id, category, needs_clarification, last_category, is_recurring).
     needs_clarification=True means the merchant is ambiguous; category will be None
     and the caller should prompt the user.
     """
@@ -78,14 +80,14 @@ async def _store_and_categorize(data: dict) -> tuple[str | None, str | None, boo
     result = await _run_script(*args)
     if not result or result.get("duplicate"):
         log.info("transaction duplicate or storage failed")
-        return None, None, False, None
+        return None, None, False, None, False
 
     tx_id = result.get("id")
     log.info("stored transaction %s", tx_id)
 
     merchant = data.get("merchant")
     if not tx_id or not merchant:
-        return tx_id, None, False, None
+        return tx_id, None, False, None, False
 
     # 1. Check merchant cache.
     lookup = await _run_script(sys.executable, _LOOKUP_CAT, "--merchant", merchant)
@@ -93,12 +95,15 @@ async def _store_and_categorize(data: dict) -> tuple[str | None, str | None, boo
     if lookup and lookup.get("found"):
         if lookup.get("needs_clarification"):
             log.info("merchant %s flagged needs_clarification", merchant)
-            return tx_id, None, True, lookup.get("last_category")
+            return tx_id, None, True, lookup.get("last_category"), False
         category = lookup.get("category")
         if category:
             await _run_script(sys.executable, _SAVE_CAT, "--id", tx_id, "--category", category)
-            log.info("cache hit %s → %s", merchant, category)
-            return tx_id, category, False, None
+            is_recurring = bool(lookup.get("is_recurring"))
+            if is_recurring:
+                await _run_script(sys.executable, _MARK_RECURRING, "--id", tx_id)
+            log.info("cache hit %s → %s (recurring=%s)", merchant, category, is_recurring)
+            return tx_id, category, False, None, is_recurring
 
     # 2. Cache miss — call LLM.
     log.info("cache miss for %s, calling LLM", merchant)
@@ -109,10 +114,23 @@ async def _store_and_categorize(data: dict) -> tuple[str | None, str | None, boo
     )
 
     if not cat_result:
-        return tx_id, None, False, None
+        return tx_id, None, False, None, False
 
     needs_clarification = cat_result.get("needs_clarification", False)
     category = cat_result.get("category") if not needs_clarification else None
+
+    if category:
+        await _run_script(sys.executable, _SAVE_CAT, "--id", tx_id, "--category", category)
+        log.info("LLM categorized %s → %s", merchant, category)
+
+    # 3. Detect recurring from transaction history.
+    is_recurring = False
+    if category:
+        rec_result = await _run_script(sys.executable, _DETECT_RECURRING, "--merchant", merchant)
+        if rec_result and rec_result.get("is_recurring"):
+            is_recurring = True
+            await _run_script(sys.executable, _MARK_RECURRING, "--id", tx_id)
+            log.info("recurring detected for %s (%d months)", merchant, rec_result.get("months_found", 0))
 
     # Persist merchant so future transactions hit the cache.
     save_args = [sys.executable, _SAVE_MERCHANT, "--name", merchant]
@@ -120,13 +138,11 @@ async def _store_and_categorize(data: dict) -> tuple[str | None, str | None, boo
         save_args += ["--category", category]
     if needs_clarification:
         save_args += ["--needs-clarification"]
+    if is_recurring:
+        save_args += ["--is-recurring"]
     await _run_script(*save_args)
 
-    if category:
-        await _run_script(sys.executable, _SAVE_CAT, "--id", tx_id, "--category", category)
-        log.info("LLM categorized %s → %s", merchant, category)
-
-    return tx_id, category, needs_clarification, None
+    return tx_id, category, needs_clarification, None, is_recurring
 
 
 def _lookup_account_alias(bank: str, account_type: str, currency: str) -> str | None:
@@ -200,7 +216,7 @@ async def gateway(request: Request) -> JSONResponse:
              transaction_type, amount, channel, bank)
 
     # Store and auto-categorize
-    tx_id, category, needs_clarification, last_category = await _store_and_categorize(data)
+    tx_id, category, needs_clarification, last_category, is_recurring = await _store_and_categorize(data)
 
     # Build notification
     type_label = str(transaction_type).replace("_", " ").title()
@@ -217,7 +233,8 @@ async def gateway(request: Request) -> JSONResponse:
     candidate_marker = " 🧪" if pattern_status == "candidate" else ""
     message = f"💳 *{type_label}*{account_line}{candidate_marker}\n{' | '.join(parts)}"
     if category:
-        message += f"\n🏷️ {category.replace('_', ' ').title()}"
+        recurring_marker = " 🔄" if is_recurring else ""
+        message += f"\n🏷️ {category.replace('_', ' ').title()}{recurring_marker}"
     elif needs_clarification:
         suggestion = f" (last time: {last_category})" if last_category else ""
         message += f"\n❓ What was this {merchant} charge for?{suggestion}"

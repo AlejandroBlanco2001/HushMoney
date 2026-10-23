@@ -140,6 +140,7 @@ CREATE TABLE IF NOT EXISTS merchants (
     category            TEXT REFERENCES categories(slug),
     needs_clarification INTEGER NOT NULL DEFAULT 0,
     last_category       TEXT REFERENCES categories(slug),
+    is_recurring        INTEGER NOT NULL DEFAULT 0,  -- set once ≥4 months of same-day charges seen
     created_at          TEXT NOT NULL,
     updated_at          TEXT NOT NULL
 );

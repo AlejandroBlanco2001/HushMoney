@@ -5,6 +5,7 @@ Usage:
   python3 save_merchant.py --name "MCD" --category food
   python3 save_merchant.py --name "RAPPI" --needs-clarification
   python3 save_merchant.py --name "RAPPI" --needs-clarification --last-category food
+  python3 save_merchant.py --name "NETFLIX" --category entertainment --is-recurring
 
 Output: {"ok": true}
 """
@@ -26,6 +27,7 @@ def main() -> None:
     parser.add_argument("--category", default=None)
     parser.add_argument("--needs-clarification", action="store_true")
     parser.add_argument("--last-category", default=None, help="Most recent confirmed category")
+    parser.add_argument("--is-recurring", action="store_true")
     args = parser.parse_args()
 
     name = " ".join(args.name.split()).upper()
@@ -35,15 +37,17 @@ def main() -> None:
     with con:
         con.execute(
             """
-            INSERT INTO merchants (name, category, needs_clarification, last_category, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO merchants (name, category, needs_clarification, last_category, is_recurring, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(name) DO UPDATE SET
                 category            = excluded.category,
                 needs_clarification = excluded.needs_clarification,
                 last_category       = COALESCE(excluded.last_category, last_category),
+                is_recurring        = MAX(is_recurring, excluded.is_recurring),
                 updated_at          = excluded.updated_at
             """,
-            (name, args.category, int(args.needs_clarification), args.last_category, now, now),
+            (name, args.category, int(args.needs_clarification), args.last_category,
+             int(args.is_recurring), now, now),
         )
     con.close()
     print(json.dumps({"ok": True}))

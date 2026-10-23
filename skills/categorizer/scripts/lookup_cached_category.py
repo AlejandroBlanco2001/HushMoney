@@ -33,18 +33,19 @@ def main() -> None:
 
     # 1. Check dedicated merchants cache first.
     row = con.execute(
-        "SELECT category, needs_clarification, last_category FROM merchants WHERE name = ?",
+        "SELECT category, needs_clarification, last_category, COALESCE(is_recurring, 0) FROM merchants WHERE name = ?",
         (name,),
     ).fetchone()
 
     if row is not None:
         con.close()
-        category, needs_clarification, last_category = row
+        category, needs_clarification, last_category, is_recurring = row
         print(json.dumps({
             "found": True,
             "category": category,
             "needs_clarification": bool(needs_clarification),
             "last_category": last_category,
+            "is_recurring": bool(is_recurring),
         }))
         return
 
@@ -62,7 +63,7 @@ def main() -> None:
     con.close()
 
     if not rows:
-        print(json.dumps({"found": False, "category": None, "needs_clarification": False}))
+        print(json.dumps({"found": False, "category": None, "needs_clarification": False, "is_recurring": False}))
         return
 
     top_category, top_count = rows[0]
@@ -70,7 +71,7 @@ def main() -> None:
     confidence = top_count / total
 
     if top_count < _MIN_SAMPLES or confidence < _MIN_CONFIDENCE:
-        print(json.dumps({"found": False, "category": None, "needs_clarification": False}))
+        print(json.dumps({"found": False, "category": None, "needs_clarification": False, "is_recurring": False}))
         return
 
     print(json.dumps({
@@ -78,6 +79,7 @@ def main() -> None:
         "category": top_category,
         "needs_clarification": False,
         "last_category": None,
+        "is_recurring": False,
     }))
 
 

@@ -44,24 +44,24 @@ def _seed_db(db_path: str) -> None:
 
     # Seed merchants
     con.execute(
-        "INSERT INTO merchants (name, category, needs_clarification, last_category, created_at, updated_at)"
-        " VALUES (?, ?, ?, ?, ?, ?)",
-        ("NETFLIX", "entertainment", 0, None, now, now),
+        "INSERT INTO merchants (name, category, needs_clarification, last_category, is_recurring, created_at, updated_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?)",
+        ("NETFLIX", "entertainment", 0, None, 1, now, now),
     )
     con.execute(
-        "INSERT INTO merchants (name, category, needs_clarification, last_category, created_at, updated_at)"
-        " VALUES (?, ?, ?, ?, ?, ?)",
-        ("UBER RIDES", "transport", 0, None, now, now),
+        "INSERT INTO merchants (name, category, needs_clarification, last_category, is_recurring, created_at, updated_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?)",
+        ("UBER RIDES", "transport", 0, None, 0, now, now),
     )
     con.execute(
-        "INSERT INTO merchants (name, category, needs_clarification, last_category, created_at, updated_at)"
-        " VALUES (?, ?, ?, ?, ?, ?)",
-        ("RAPPI", None, 1, "food", now, now),
+        "INSERT INTO merchants (name, category, needs_clarification, last_category, is_recurring, created_at, updated_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?)",
+        ("RAPPI", None, 1, "food", 0, now, now),
     )
     con.execute(
-        "INSERT INTO merchants (name, category, needs_clarification, last_category, created_at, updated_at)"
-        " VALUES (?, ?, ?, ?, ?, ?)",
-        ("PEXTO CAPITAL SAS", None, 1, None, now, now),
+        "INSERT INTO merchants (name, category, needs_clarification, last_category, is_recurring, created_at, updated_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?)",
+        ("PEXTO CAPITAL SAS", None, 1, None, 0, now, now),
     )
 
     # Seed an account + transactions for the fallback test (no merchants row for "MCD")
@@ -92,6 +92,7 @@ class Case:
     expect_needs_clarification: bool
     expect_category: str | None       # None means "don't check"
     expect_last_category: str | None  # None means "don't check"
+    expect_is_recurring: bool | None  # None means "don't check"
     description: str
 
 
@@ -103,7 +104,8 @@ CASES: list[Case] = [
         expect_needs_clarification=False,
         expect_category="entertainment",
         expect_last_category=None,
-        description="Known unambiguous merchant → direct category",
+        expect_is_recurring=True,
+        description="Known recurring merchant → is_recurring=true",
     ),
     Case(
         name="uber_rides_cache_hit",
@@ -112,7 +114,8 @@ CASES: list[Case] = [
         expect_needs_clarification=False,
         expect_category="transport",
         expect_last_category=None,
-        description="Known unambiguous merchant with multi-word name",
+        expect_is_recurring=False,
+        description="Non-recurring merchant → is_recurring=false",
     ),
     Case(
         name="rappi_needs_clarification",
@@ -121,6 +124,7 @@ CASES: list[Case] = [
         expect_needs_clarification=True,
         expect_category=None,
         expect_last_category="food",
+        expect_is_recurring=None,
         description="Known ambiguous merchant → needs_clarification with last_category hint",
     ),
     Case(
@@ -130,6 +134,7 @@ CASES: list[Case] = [
         expect_needs_clarification=True,
         expect_category=None,
         expect_last_category=None,
+        expect_is_recurring=None,
         description="Known ambiguous merchant with no prior category",
     ),
     Case(
@@ -139,6 +144,7 @@ CASES: list[Case] = [
         expect_needs_clarification=False,
         expect_category=None,
         expect_last_category=None,
+        expect_is_recurring=None,
         description="Completely unknown merchant → cache miss",
     ),
     Case(
@@ -148,7 +154,8 @@ CASES: list[Case] = [
         expect_needs_clarification=False,
         expect_category="entertainment",
         expect_last_category=None,
-        description="Lookup is case-insensitive (bank may emit mixed case)",
+        expect_is_recurring=True,
+        description="Case-insensitive lookup preserves is_recurring flag",
     ),
     Case(
         name="whitespace_normalization",
@@ -157,6 +164,7 @@ CASES: list[Case] = [
         expect_needs_clarification=False,
         expect_category="transport",
         expect_last_category=None,
+        expect_is_recurring=None,
         description="Extra whitespace is normalized before lookup",
     ),
     Case(
@@ -166,6 +174,7 @@ CASES: list[Case] = [
         expect_needs_clarification=False,
         expect_category="food",
         expect_last_category=None,
+        expect_is_recurring=None,
         description="No merchants row but 4 matching transactions → fallback finds food",
     ),
 ]
@@ -208,6 +217,11 @@ def run_case(case: Case, db_path: str, verbose: bool) -> tuple[bool, str]:
     if case.expect_last_category is not None and result.get("last_category") != case.expect_last_category:
         failures.append(
             f"last_category={result.get('last_category')!r} want {case.expect_last_category!r}"
+        )
+
+    if case.expect_is_recurring is not None and result.get("is_recurring") != case.expect_is_recurring:
+        failures.append(
+            f"is_recurring={result.get('is_recurring')} want {case.expect_is_recurring}"
         )
 
     if failures:
