@@ -2,53 +2,98 @@ from __future__ import annotations
 
 import dataclasses
 import re
+from dataclasses import dataclass
+from enum import StrEnum
 
 from forwarder.sanitizer import parser
 from forwarder.sanitizer.models import Channel, CleanPayload
+from forwarder.sanitizer.parser import ParseStatus
 from forwarder.sanitizer.redaction import REDACTED, redact
+from forwarder.sanitizer.registry import REGISTRY
 from forwarder.sanitizer.selector import BankSelector
 
 
-__all__ = ['CleanPayload', 'sanitize', 'sanitize_push']
+__all__ = ['CleanPayload', 'SanitizeResult', 'SanitizeStatus', 'sanitize', 'sanitize_push']
 
-_BANK_SELECTOR = BankSelector()
 _SUSPICIOUS_MERCHANT = re.compile(r'\d{4,}|@|https?:', re.IGNORECASE)
 
 
-def sanitize_push(
-    app_name: str, body: str, channel: Channel
-) -> tuple[CleanPayload | None, bool]:
+class SanitizeStatus(StrEnum):
+    MATCHED = 'matched'
+    BANK_UNKNOWN = 'bank_unknown'
+    NO_TEMPLATE = 'no_template'
+    DATE_FAILED = 'date_failed'
+    INVALID_AMOUNT = 'invalid_amount'
+
+
+@dataclass(frozen=True)
+class SanitizeResult:
+    status: SanitizeStatus
+    redacted_text: str
+    bank_slug: str | None
+    payload: CleanPayload | None = None
+
+
+_PARSE_TO_SANITIZE: dict[ParseStatus, SanitizeStatus] = {
+    ParseStatus.NO_TEMPLATE: SanitizeStatus.NO_TEMPLATE,
+    ParseStatus.DATE_FAILED: SanitizeStatus.DATE_FAILED,
+    ParseStatus.INVALID_AMOUNT: SanitizeStatus.INVALID_AMOUNT,
+}
+
+
+def sanitize_push(app_name: str, body: str, channel: Channel) -> tuple[CleanPayload | None, bool]:
     """Try to parse a push notification given its app name and message body.
 
     Returns (payload, bank_found). bank_found=False means no bank matched the
     app name; bank_found=True means a bank was found but the message may not
     have matched any transaction pattern.
     """
-    bank = _BANK_SELECTOR.select_bank_by_app(app_name)
+    REGISTRY.reload_if_changed()
+    snap = REGISTRY.snapshot()
+    bank = BankSelector(snap).select_bank_by_app(app_name)
     if bank is None:
         return None, False
     clean_body = redact(body)
-    payload = parser.parse(clean_body, channel, bank)
-    if payload is None or payload.merchant is None:
-        return payload, True
-    return dataclasses.replace(payload, merchant=_normalize_merchant(payload.merchant)), True
+    result = parser.parse(clean_body, channel, bank)
+    if result.status != ParseStatus.OK or result.payload is None:
+        return None, True
+    payload = result.payload
+    if payload.merchant is not None:
+        payload = dataclasses.replace(payload, merchant=_normalize_merchant(payload.merchant))
+    return payload, True
 
 
-def sanitize(text: str, channel: Channel, *, sender: str | None = None) -> CleanPayload | None:
+def sanitize(text: str, channel: Channel, *, sender: str | None = None) -> SanitizeResult:
+    REGISTRY.reload_if_changed()
+    snap = REGISTRY.snapshot()
     clean_text = redact(text)
-    bank = _BANK_SELECTOR.select_bank(clean_text, sender)
+    bank = BankSelector(snap).select_bank(clean_text, sender)
     if bank is None:
-        return None
-    payload = parser.parse(clean_text, channel, bank)
-    if payload is None or payload.merchant is None:
-        return payload
-    return dataclasses.replace(payload, merchant=_normalize_merchant(payload.merchant))
+        return SanitizeResult(
+            status=SanitizeStatus.BANK_UNKNOWN,
+            redacted_text=clean_text,
+            bank_slug=None,
+        )
+    result = parser.parse(clean_text, channel, bank)
+    if result.status != ParseStatus.OK or result.payload is None:
+        return SanitizeResult(
+            status=_PARSE_TO_SANITIZE.get(result.status, SanitizeStatus.NO_TEMPLATE),
+            redacted_text=clean_text,
+            bank_slug=bank.name,
+        )
+    payload = result.payload
+    if payload.merchant is not None:
+        payload = dataclasses.replace(payload, merchant=_normalize_merchant(payload.merchant))
+    return SanitizeResult(
+        status=SanitizeStatus.MATCHED,
+        redacted_text=clean_text,
+        bank_slug=bank.name,
+        payload=payload,
+    )
 
 
 def _normalize_merchant(raw: str) -> str | None:
     merchant = ' '.join(raw.split()).upper()
-    # Merchant is the only free-text field that leaves the forwarder; if it still carries
-    # anything that looks sensitive, drop it rather than ship it.
     if not merchant or REDACTED in merchant or _SUSPICIOUS_MERCHANT.search(merchant):
         return None
     return merchant

@@ -33,7 +33,7 @@ def test_email_pipeline_routes_by_sender(monkeypatch, sender, expected_dispatche
     monkeypatch.setattr(
         entrypoint.hermes, 'dispatch', lambda payload, *_: dispatched.append(payload)
     )
-    entrypoint.poll(cfg)
+    entrypoint.poll(cfg, unmatched_handler=None)
     assert len(dispatched) == expected_dispatches
     if dispatched:
         assert dispatched[0].merchant == 'EXITO'

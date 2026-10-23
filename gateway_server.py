@@ -63,6 +63,10 @@ async def _store_and_categorize(data: dict) -> tuple[str | None, str | None]:
     ]
     if data.get("merchant"):
         args += ["--merchant", data["merchant"]]
+    if data.get("template_id"):
+        args += ["--template-id", data["template_id"]]
+    if data.get("pattern_status"):
+        args += ["--pattern-status", data["pattern_status"]]
 
     result = await _run_script(*args)
     if not result or result.get("duplicate"):
@@ -150,6 +154,7 @@ async def gateway(request: Request) -> JSONResponse:
     channel = data.get("channel", "")
     bank = data.get("bank", "unknown")
     account_type = data.get("account_type", "")
+    pattern_status = data.get("pattern_status", "active")
 
     log.info("incoming transaction type=%s amount=%s channel=%s bank=%s",
              transaction_type, amount, channel, bank)
@@ -169,7 +174,8 @@ async def gateway(request: Request) -> JSONResponse:
     alias = _lookup_account_alias(bank, account_type, currency)
     account_line = f" — {alias}" if alias else (f" — {bank.title()}" if bank != "unknown" else "")
 
-    message = f"💳 *{type_label}*{account_line}\n{' | '.join(parts)}"
+    candidate_marker = " 🧪" if pattern_status == "candidate" else ""
+    message = f"💳 *{type_label}*{account_line}{candidate_marker}\n{' | '.join(parts)}"
     if category:
         message += f"\n🏷️ {category.replace('_', ' ').title()}"
 

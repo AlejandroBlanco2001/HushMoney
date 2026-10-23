@@ -117,18 +117,52 @@ def test_unrecognized_text_never_falls_through_to_chat(harness, update, text):
     assert requests == []
 
 
-def test_push_from_unknown_app_forwarded_to_bank_learning(harness, update, cfg):
+def test_push_from_unknown_app_routed_to_learning(cfg):
+    """Unknown-app push notifications are handed to UnmatchedHandler (redacted, no raw text)."""
+    from forwarder.learning.unmatched import UnmatchedHandler
+    from forwarder.learning.store import PatternStore
+    import tempfile, pathlib
+
+    captured: list[dict] = []
+
+    class _FakeStore:
+        def get_fingerprint(self, fp): return None
+        def upsert_fingerprint(self, *a, **kw): pass
+        def upsert_fingerprint_state(self, *a): pass
+
+    class _CaptureHandler(UnmatchedHandler):
+        def __init__(self):
+            self._store = _FakeStore()
+            self._hermes_url = cfg.hermes_webhook_url
+            self._webhook_secret = cfg.webhook_secret
+
+        async def handle_async(self, *, redacted_text, bank_slug, channel, status, **kw):
+            captured.append({'text': redacted_text, 'bank': bank_slug, 'channel': channel})
+
+    requests = []
+
+    def capture(request):
+        requests.append(request)
+        return httpx.Response(200)
+
+    outbound = httpx.AsyncClient(transport=httpx.MockTransport(capture))
+    handler = _CaptureHandler()
+
+    update = json.loads((FIXTURES / 'telegram/forwarded_purchase.json').read_text())
     del update['message']['forward_origin']
-    update['message']['text'] = 'Rappipay: compra $32.500,00 cuenta 1234'
-    client, requests = harness
-    assert client.post('/telegram', json=update, headers=HEADERS).status_code == 200
-    assert len(requests) == 1
-    request = requests[0]
-    assert str(request.url) == cfg.hermes_webhook_url
-    assert request.headers['x-telegram-bot-api-secret-token'] == cfg.webhook_secret
-    body = json.loads(request.content)
-    assert body['message']['text'] == 'Rappipay: compra $32.500,00 cuenta 1234'
-    assert 'entities' not in body['message']
+    # The account number 123456 (6 digits) must be redacted in the text sent to learning.
+    update['message']['text'] = 'Rappipay: compra $32.500,00 cuenta 123456'
+
+    with TestClient(create_app(cfg, outbound, unmatched_handler=handler)) as client:
+        response = client.post('/telegram', json=update, headers=HEADERS)
+
+    assert response.status_code == 200
+    assert len(captured) == 1
+    assert '123456' not in captured[0]['text']
+    assert '[REDACTED]' in captured[0]['text']
+    assert captured[0]['channel'] == 'sms'
+    # Unmatched handler sends its own request; no direct gateway request here.
+    assert requests == []
 
 
 @pytest.mark.parametrize('metadata', ['forward_origin', 'forward_from', 'forward_date'])

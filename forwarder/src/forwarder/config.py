@@ -3,8 +3,10 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+
 try:
     from dotenv import load_dotenv
+
     load_dotenv()  # no-op if .env not present; only active when python-dotenv is installed (dev)
 except ImportError:
     pass

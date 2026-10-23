@@ -19,10 +19,12 @@ ENV = {
 }
 
 
-def _make_msg(chat_id: int, text: str | None) -> MagicMock:
+def _make_msg(chat_id: int, text: str | None, msg_id: int = 42) -> MagicMock:
     msg = MagicMock()
     msg.chat.id = chat_id
     msg.text = text
+    msg.id = msg_id
+    msg.date = None
     return msg
 
 
@@ -60,10 +62,27 @@ def handler():
 
 @pytest.mark.asyncio
 async def test_saved_messages_text_is_forwarded(handler):
+    import httpx
+
+    posted: list[dict] = []
+
+    def mock_post(url, *, json, headers, **kwargs):
+        posted.append({'url': url, 'json': json, 'headers': headers})
+        return httpx.Response(200)
+
     client = AsyncMock()
     msg = _make_msg(MY_ID, "Bancolombia: Transferiste $75.000,00 desde tu cuenta")
-    await handler(client, msg)
-    client.send_message.assert_awaited_once_with(BOT_USERNAME, msg.text)
+
+    with patch('httpx.AsyncClient') as mock_ac:
+        instance = AsyncMock()
+        instance.post = AsyncMock(side_effect=mock_post)
+        instance.__aenter__ = AsyncMock(return_value=instance)
+        instance.__aexit__ = AsyncMock(return_value=False)
+        mock_ac.return_value = instance
+        await handler(client, msg)
+
+    assert len(posted) == 1
+    assert posted[0]['json']['message']['text'] == msg.text
 
 
 @pytest.mark.asyncio

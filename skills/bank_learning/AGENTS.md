@@ -1,77 +1,49 @@
 # bank_learning skill
 
-Teaches HushMoney how to parse notifications from banks that don't have community
-patterns yet. Triggered automatically when the sanitizer has no match, or manually
-when the user adds a new bank.
+Teaches HushMoney how to parse notifications from banks it hasn't seen before.
 
-## Two modes
+## How it is triggered
 
-**Reactive** (auto-triggered): sanitizer passes the raw message here as a last resort.
-This is the only place in the system where Hermes handles pre-sanitization content.
-Read `docs/rules/security.md` — the bank_learning exception rules — before touching
-anything in this skill.
+The forwarder auto-detects financial notifications it cannot parse and forwards them
+to Hermes with a `[bank_learning]` header. Only the **redacted** text is forwarded —
+no amounts, account numbers, or merchant names. The agent then works with the user
+to build a regex pattern, confirms the expected values, and submits a proposal to
+the forwarder inbox.
 
-**Proactive** (user-triggered via `hermes add-bank`): user provides already-redacted
-sample messages. No raw content involved.
+## Security rules
 
-## What this skill must do
+- No raw (unredacted) message content ever appears in this skill.
+- The agent must never ask the user to paste unredacted content.
+- The agent must never try to reconstruct real values from `[REDACTED]` placeholders.
+- Expected values (amount, date) come exclusively from user confirmation — never inferred.
+- Proposal files are processed and deleted by the forwarder; they never persist raw text.
 
-1. Ask the user which bank and country
-2. Accept redacted sample messages from the user (proactive) or infer from raw (reactive)
-3. Call the NVIDIA model with a **structure-only prompt** — extract field positions,
-   delimiters, date formats, strip targets. Never reproduce values.
-4. Show inferred transaction summary to user for confirmation
-5. On confirmation: store pattern in SQLite under `learned_patterns` table
-6. Optionally generate fixture files (`tests/fixtures/{channel}/{bank}/`) for community PR
+## Scripts available
 
-## Pattern storage schema (SQLite)
+| Script | Purpose |
+|--------|---------|
+| `get_bank_context.py` | Read current bank registry (templates, separators) |
+| `propose_pattern.py` | Submit a validated pattern proposal to the forwarder inbox |
+| `mark_ignored.py` | Silence a fingerprint permanently |
+| `report_feedback.py` | Send `correct`/`wrong` verdict for a learned pattern |
 
-```sql
-CREATE TABLE learned_patterns (
-    id          INTEGER PRIMARY KEY,
-    bank_slug   TEXT NOT NULL,        -- e.g. "davivienda"
-    country     TEXT NOT NULL,        -- e.g. "CO"
-    channel     TEXT NOT NULL,        -- "email" | "sms"
-    pattern     TEXT NOT NULL,        -- JSON: field extraction rules
-    confirmed   INTEGER DEFAULT 0,    -- 1 = user confirmed at least once
-    uses        INTEGER DEFAULT 0,    -- times applied successfully
-    created_at  TEXT NOT NULL,
-    updated_at  TEXT NOT NULL
-);
-```
+## Pattern lifecycle
 
-## Contributing learned patterns to the community
+1. **Proposed** → written to `proposals/` directory
+2. **Candidate** → validated and accepted; appears in transactions with 🧪 marker
+3. **Active** → auto-promoted after 3 distinct uses with no corrections over 24h
+4. **Rejected** → bad feedback; fingerprint re-opened for re-learning
 
-After 7 days and N successful uses with no corrections, prompt the user:
+## Environment variables
 
-```
-"The Davivienda pattern has been working correctly for 7 days.
- Want me to generate fixture files so others can benefit?
- This creates files in tests/fixtures/ — you can open a PR."
-```
-
-If yes: generate `{scenario}.txt` + `{scenario}.expected.json` using synthetic values
-(follow `tests/fixtures/SYNTHETIC_DATA.md` rules), write to the repo, notify user.
-
-## Locale context
-
-Before calling the model for structural inference, read the user's locale from SQLite
-(stored by the `setup` skill). Inject it into the system prompt to remove date format
-ambiguity — a US user seeing `09/15/2026` uses MM/DD/YYYY; everyone else uses DD/MM/YYYY.
-
-```sql
-SELECT value FROM user_settings WHERE key = 'locale';  -- ISO country code, e.g. "CO", "IN", "US"
-```
-
-If locale is not set (user skipped setup or added a bank before completing it), omit
-the locale hint and let the user confirm the inferred date format explicitly during
-the confirmation step.
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `HUSHMONEY_INBOX` | `~/.hermes/pattern-inbox` | Inbox directory for proposals/results |
+| `HUSHMONEY_REGISTRY` | `~/.hermes/pattern-inbox/registry.json` | Registry snapshot file |
 
 ## What NOT to do
 
-- Do not store raw message content anywhere — not in SQLite, not in logs
-- Do not call the model with a prompt that asks it to extract values (amounts, names)
-  from the raw message — structural inference only
-- Do not apply a learned pattern without user confirmation (reactive mode)
-- Do not run in proactive mode with real (non-redacted) samples — if the user pastes
-  a real bank message, ask them to redact it first
+- Do not call older scripts (`query_patterns.py`, `store_pattern.py`) — they are deprecated.
+- Do not write directly to the SQLite database — use the inbox scripts.
+- Do not submit a proposal without user confirmation of the expected values.
+- Do not expose the `[bank_learning]` header content verbatim in your reply.

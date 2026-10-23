@@ -63,10 +63,13 @@ def main() -> None:
     parser.add_argument('--account-type',     required=True,
                         choices=['checking', 'savings', 'credit', 'digital_wallet'])
     parser.add_argument('--channel',          required=True, choices=['email', 'sms'])
-    parser.add_argument('--merchant',         default=None)
-    parser.add_argument('--bank',             default='unknown')
-    parser.add_argument('--message-hash',     default=None,
+    parser.add_argument('--merchant',        default=None)
+    parser.add_argument('--bank',            default='unknown')
+    parser.add_argument('--message-hash',    default=None,
                         help='SHA-256 hex fingerprint for dedup; computed if omitted')
+    parser.add_argument('--template-id',     default=None)
+    parser.add_argument('--pattern-status',  default='active',
+                        choices=['active', 'candidate'])
     args = parser.parse_args()
 
     message_hash = args.message_hash or hashlib.sha256(
@@ -91,11 +94,13 @@ def main() -> None:
             con.execute(
                 '''INSERT INTO transactions
                    (id, account_id, amount, currency, merchant, date,
-                    transaction_type, channel, message_hash, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                    transaction_type, channel, message_hash,
+                    template_id, pattern_status, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                 (transaction_id, account_id, args.amount, args.currency,
                  args.merchant, args.date, args.transaction_type,
-                 args.channel, message_hash, now, now),
+                 args.channel, message_hash,
+                 args.template_id, args.pattern_status, now, now),
             )
     finally:
         con.close()

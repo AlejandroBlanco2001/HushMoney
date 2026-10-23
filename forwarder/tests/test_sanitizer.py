@@ -9,7 +9,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from forwarder.imap import _extract_plain_text
-from forwarder.sanitizer import sanitize
+from forwarder.sanitizer import SanitizeStatus, sanitize
 
 
 FIXTURES = Path(__file__).resolve().parents[2] / 'tests' / 'fixtures'
@@ -21,6 +21,9 @@ ALLOWED_KEYS = {
     'transaction_type',
     'account_type',
     'channel',
+    'bank',
+    'template_id',
+    'pattern_status',
 }
 
 
@@ -44,15 +47,30 @@ def test_fixture_matches_expected(raw_path: Path):
     assert expected_path.exists(), f'missing {expected_path.name}'
 
     channel = 'email' if raw_path.suffix == '.eml' else 'sms'
-    payload = sanitize(_read_body(raw_path), channel=channel)
+    result = sanitize(_read_body(raw_path), channel=channel)
 
-    assert payload is not None, 'no pattern matched'
-    assert payload.to_json() == json.loads(expected_path.read_text(encoding='utf-8'))
+    assert result.status == SanitizeStatus.MATCHED, f'no pattern matched: {result.status}'
+    assert result.payload is not None
+    assert result.payload.to_json() == json.loads(expected_path.read_text(encoding='utf-8'))
+
+
+def test_transfer_us_format_amount_parsed_correctly():
+    # Transfer SMS uses US-style separators (1,000.00) while other Bancolombia
+    # SMS use European style (1.000,00). The parser must auto-detect.
+    text = (
+        'Bancolombia: Transferiste $1,000.00 desde tu cuenta *4621 a la cuenta '
+        '*3146874941 el 20/10/26 a las 19:06. ¿Dudas? Llamanos al 018000931987.'
+    )
+    result = sanitize(text, channel='sms')
+    assert result.status == SanitizeStatus.MATCHED
+    assert result.payload is not None
+    assert result.payload.amount == 1000.0
 
 
 def test_unknown_bank_is_not_matched():
     text = 'RappiPay: Compraste $47.350,00 en Rappi con tu T.Deb *1234, el 15/09/2026 a las 12:43.'
-    assert sanitize(text, channel='sms') is None
+    result = sanitize(text, channel='sms')
+    assert result.status != SanitizeStatus.MATCHED
 
 
 def test_missing_leading_b_still_matches():
@@ -60,9 +78,10 @@ def test_missing_leading_b_still_matches():
         'ancolombia: Compraste $32.500,00 en UBER RIDES con tu T.Deb *1234, '
         'el 15/09/2026 a las 20:35.'
     )
-    payload = sanitize(text, channel='sms')
-    assert payload is not None
-    assert payload.merchant == 'UBER RIDES'
+    result = sanitize(text, channel='sms')
+    assert result.status == SanitizeStatus.MATCHED
+    assert result.payload is not None
+    assert result.payload.merchant == 'UBER RIDES'
 
 
 digits = st.text(alphabet='0123456789', min_size=1)
@@ -82,17 +101,16 @@ def test_transfer_secrets_never_survive(llave: str, otp: str, account: str):
         f'en tu cuenta *{account} conectada a la llave {llave} el 14/09/26 a las 01:40. '
         f'Tu codigo OTP es {otp}. Con llaves es de una y gratis. Dudas al 018000912345'
     )
-    payload = sanitize(text, channel='sms')
+    result = sanitize(text, channel='sms')
 
-    assert payload is not None
-    serialized = json.dumps(payload.to_json())
+    assert result.status == SanitizeStatus.MATCHED
+    assert result.payload is not None
+    serialized = json.dumps(result.payload.to_json())
     for secret in (llave, otp, 'MARIA', 'JUAN', '018000912345'):
         assert secret not in serialized
-    assert payload.merchant is None
+    assert result.payload.merchant is None
 
 
-# A bare alphanumeric alias (no '@') is indistinguishable from a store name outside the
-# "la llave" phrase, so only context-free secrets are injected into the merchant slot.
 merchant_secrets = st.one_of(
     cedulas,
     phones,
@@ -108,10 +126,11 @@ def test_secret_inside_merchant_is_dropped(secret: str, account: str):
         f'Bancolombia: Compraste $47.350,00 en TIENDA {secret} con tu T.Deb *{account}, '
         'el 15/09/2026 a las 12:43.'
     )
-    payload = sanitize(text, channel='email')
+    result = sanitize(text, channel='email')
 
-    assert payload is not None
-    assert payload.merchant is None or secret not in payload.merchant
+    assert result.status == SanitizeStatus.MATCHED
+    assert result.payload is not None
+    assert result.payload.merchant is None or secret not in result.payload.merchant
 
 
 @given(merchant=st.text(min_size=1, max_size=60))
@@ -120,15 +139,15 @@ def test_merchant_never_carries_digit_runs_or_addresses(merchant: str):
         f'Bancolombia: Compraste $10.000,00 en {merchant} con tu T.Deb *1234, '
         'el 15/09/2026 a las 12:43.'
     )
-    payload = sanitize(text, channel='email')
+    result = sanitize(text, channel='email')
 
-    if payload is not None and payload.merchant is not None:
-        assert '@' not in payload.merchant
-        assert not any(run.isdigit() and len(run) >= 4 for run in payload.merchant.split())
+    if result.payload is not None and result.payload.merchant is not None:
+        assert '@' not in result.payload.merchant
+        assert not any(run.isdigit() and len(run) >= 4 for run in result.payload.merchant.split())
 
 
 @given(text=st.text())
 def test_arbitrary_input_never_raises_or_adds_fields(text: str):
-    payload = sanitize(text, channel='sms')
-    if payload is not None:
-        assert set(payload.to_json()) <= ALLOWED_KEYS
+    result = sanitize(text, channel='sms')
+    if result.payload is not None:
+        assert set(result.payload.to_json()) <= ALLOWED_KEYS

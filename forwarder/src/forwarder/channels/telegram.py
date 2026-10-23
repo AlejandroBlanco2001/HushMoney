@@ -22,15 +22,13 @@ from starlette.responses import Response
 from starlette.routing import Route
 
 from forwarder import hermes
-from forwarder.sanitizer import sanitize, sanitize_push
+from forwarder.sanitizer import SanitizeStatus, sanitize, sanitize_push
 
 
 log = logging.getLogger(__name__)
 MAX_BODY_BYTES = 64 * 1024
 COMMANDS = frozenset({'/start', '/help', '/status', '/new', '/stop'})
 
-# Matches "AppName: message body" — app name is a single non-whitespace word starting
-# with a letter, which is the typical format for mobile push notifications.
 _PUSH_RE = re.compile(r'^([A-Za-z]\S*):\s*(.+)', re.DOTALL)
 
 
@@ -170,22 +168,7 @@ def _build_message(update: object, chat_id: int) -> Message | None:
     )
 
 
-def _build_plain_update(message: Message, chat_id: int) -> dict[str, object]:
-    """Minimal update forwarded to Hermes for skill routing (e.g. bank_learning)."""
-    return {
-        'update_id': message['update_id'],
-        'message': {
-            'message_id': message['message_id'],
-            'date': message['date'],
-            'chat': {'id': chat_id, 'type': 'private'},
-            'from': {'id': chat_id, 'is_bot': False, 'first_name': 'User'},
-            'text': message['text'],
-        },
-    }
-
-
 def _build_command_update(message: Message, chat_id: int) -> dict[str, object]:
-    # Rebuild the update so names, quoted messages and other raw metadata never reach Hermes.
     return {
         'update_id': message['update_id'],
         'message': {
@@ -199,10 +182,19 @@ def _build_command_update(message: Message, chat_id: int) -> dict[str, object]:
     }
 
 
-async def route_update(update: object, cfg: TelegramConfig, client: httpx.AsyncClient) -> None:
+async def route_update(
+    update: object,
+    cfg: TelegramConfig,
+    client: httpx.AsyncClient,
+    unmatched_handler: object = None,
+) -> None:
+    from forwarder.learning.notification_filter import is_financial_notification
+    from forwarder.sanitizer.registry import REGISTRY
+
     message = _build_message(update, cfg.chat_id)
     if message is None:
         return
+
     if not message['forwarded'] and message['text'] in COMMANDS:
         await _post_json(
             client,
@@ -212,19 +204,16 @@ async def route_update(update: object, cfg: TelegramConfig, client: httpx.AsyncC
         )
         return
 
-    # Regular SMS
-    payload = sanitize(message['text'], channel='sms')
-    if payload is not None:
-        try:
-            await hermes.dispatch_async(payload, cfg.gateway_url, cfg.gateway_secret, client)
-        except httpx.HTTPError:
-            log.warning('telegram dispatch failed, message dropped')
+    # Determine if this looks like a bank notification at all.
+    snap = REGISTRY.snapshot()
+    if not is_financial_notification(message['text'], snap.banks):
+        log.info('telegram message is not a financial notification, dropped')
         return
 
-    # Push notification (App:Message) — try app-based bank lookup
-    m = _PUSH_RE.match(message['text'])
-    if m:
-        app_name, body = m.group(1), m.group(2)
+    # Try push notification format first (App: body)
+    push_match = _PUSH_RE.match(message['text'])
+    if push_match:
+        app_name, body = push_match.group(1), push_match.group(2)
         push_payload, bank_found = sanitize_push(app_name, body, channel='sms')
         if bank_found:
             if push_payload is not None:
@@ -234,20 +223,39 @@ async def route_update(update: object, cfg: TelegramConfig, client: httpx.AsyncC
                     )
                 except httpx.HTTPError:
                     log.warning('telegram push dispatch failed, message dropped')
-            else:
-                log.info('push app %r matched but message did not parse, dropped', app_name)
-            return
-        # App not in known banks — let bank_learning handle it
-        log.info('push from unknown app %r, forwarding to bank_learning', app_name)
-        await _post_json(
-            client,
-            cfg.hermes_webhook_url,
-            _build_plain_update(message, cfg.chat_id),
-            {'X-Telegram-Bot-Api-Secret-Token': cfg.webhook_secret},
-        )
+                return
+            # Known bank app but unmatched template
+            result = sanitize(message['text'], channel='sms')
+        else:
+            result = sanitize(message['text'], channel='sms')
+    else:
+        result = sanitize(message['text'], channel='sms')
+
+    if result.status == SanitizeStatus.MATCHED and result.payload is not None:
+        try:
+            await hermes.dispatch_async(result.payload, cfg.gateway_url, cfg.gateway_secret, client)
+        except httpx.HTTPError:
+            log.warning('telegram dispatch failed, message dropped')
         return
 
-    log.info('pattern not matched, telegram message dropped')
+    # Unmatched — route to learning
+    if unmatched_handler is not None:
+        from forwarder.learning.unmatched import UnmatchedHandler
+
+        assert isinstance(unmatched_handler, UnmatchedHandler)
+        await unmatched_handler.handle_async(
+            redacted_text=result.redacted_text,
+            bank_slug=result.bank_slug,
+            channel='sms',
+            status=result.status,
+            update_id=message['update_id'],
+            message_id=message['message_id'],
+            date=message['date'],
+            chat_id=cfg.chat_id,
+            client=client,
+        )
+    else:
+        log.info('telegram unmatched (no unmatched handler): %s', result.status)
 
 
 async def _post_json(
@@ -260,13 +268,16 @@ async def _post_json(
         response = await client.post(url, json=payload, headers=headers)
         response.raise_for_status()
     except httpx.HTTPError:
-        # Acknowledge failures to Telegram: no raw payload persistence or retry queue.
         log.warning('telegram dispatch failed, message dropped')
     else:
         log.info('telegram message dispatched to hermes')
 
 
-def create_app(cfg: TelegramConfig, client: httpx.AsyncClient | None = None) -> Starlette:
+def create_app(
+    cfg: TelegramConfig,
+    client: httpx.AsyncClient | None = None,
+    unmatched_handler: object = None,
+) -> Starlette:
     @asynccontextmanager
     async def lifespan(app: Starlette) -> AsyncGenerator[None]:
         async with httpx.AsyncClient(timeout=cfg.timeout_seconds, follow_redirects=False) as owned:
@@ -286,7 +297,12 @@ def create_app(cfg: TelegramConfig, client: httpx.AsyncClient | None = None) -> 
             update: object = json.loads(body)
         except (ValueError, UnicodeError, RecursionError, ClientDisconnect):
             return Response(status_code=400)
-        await route_update(update, cfg, cast('httpx.AsyncClient', request.app.state.client))
+        await route_update(
+            update,
+            cfg,
+            cast('httpx.AsyncClient', request.app.state.client),
+            unmatched_handler,
+        )
         return Response(status_code=200)
 
     return Starlette(routes=[Route('/telegram', receive, methods=['POST'])], lifespan=lifespan)

@@ -1,0 +1,39 @@
+name: bancolombia
+country: CO
+currency: COP
+thousands_separator: '.'
+decimal_separator: ','
+utc_offset_minutes: -300
+email_senders:
+  - alertasynotificaciones@ayn.notificacionesbancolombia.com
+  - alertasynotificaciones@an.notificacionesbancolombia.com
+sms_prefix: '\s*B?ancolombia:'
+app_names: []
+date: '(?P<day>\d{2})/(?P<month>\d{2})/(?P<year>\d{4}|\d{2})\s+(?:a las\s+)?(?P<hour>\d{2}):(?P<minute>\d{2})(?::(?P<second>\d{2}))?'
+amount_fragments:
+  AMOUNT: '\$(?P<amount>\d{1,3}(?:[.,]\d{3})*[.,]\d{2})'
+transactions:
+  - id: compra_debito
+    transaction_type: debit
+    account_type: checking
+    regex: 'Compraste {AMOUNT} en (?P<merchant>.+?) con tu T\.Deb'
+  - id: compra_credito
+    transaction_type: debit
+    account_type: credit
+    regex: 'Compraste {AMOUNT} en (?P<merchant>.+?) con tu T\.Cred'
+  - id: retiro
+    transaction_type: cash
+    account_type: checking
+    regex: 'Retiraste {AMOUNT} de la cuenta'
+  - id: pago
+    transaction_type: payment
+    account_type: checking
+    regex: 'Pagaste {AMOUNT} a (?P<merchant>.+?) desde tu producto'
+  - id: transferencia_enviada
+    transaction_type: transfer_out
+    account_type: checking
+    regex: 'Transferiste {AMOUNT} desde tu cuenta'
+  - id: transferencia_recibida
+    transaction_type: transfer_in
+    account_type: checking
+    regex: 'recibiste una transferencia de .+? por {AMOUNT}'

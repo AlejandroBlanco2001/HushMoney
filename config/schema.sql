@@ -58,6 +58,9 @@ CREATE TABLE IF NOT EXISTS transactions (
     message_hash     TEXT UNIQUE,                   -- SHA256(amount+date+type+masked_number)
                                                     -- prevents duplicate entries from
                                                     -- notification retries or double-forwards
+    template_id      TEXT,                          -- e.g. "bancolombia.debit_checking" or
+                                                    -- "learned:42"; NULL for legacy rows
+    pattern_status   TEXT NOT NULL DEFAULT 'active', -- 'active' | 'candidate'
     created_at       TEXT NOT NULL,
     updated_at       TEXT NOT NULL                  -- updated when user corrects a field
 );

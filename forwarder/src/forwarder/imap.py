@@ -53,11 +53,13 @@ def _fetch_from_sender(conn: imaplib.IMAP4_SSL, sender: str) -> list[Email]:
             log.warning('skipping email with no plain-text body')
             continue
 
-        results.append(Email(
-            from_=_resolve_original_sender(msg),
-            subject=_decode_header(msg.get('Subject', '')),
-            body=body.strip(),
-        ))
+        results.append(
+            Email(
+                from_=_resolve_original_sender(msg),
+                subject=_decode_header(msg.get('Subject', '')),
+                body=body.strip(),
+            )
+        )
 
         # Mark seen before returning — no retry queue by design; dropped messages are
         # preferable to re-processing and double-counting a transaction.

@@ -39,6 +39,6 @@ def test_english_code_inside_merchant_never_leaves_sanitizer(code):
         f'Bancolombia: Compraste $32.500,00 en EXITO verification code: {code} '
         'con tu T.Deb *1234, el 15/09/2026 a las 20:35.'
     )
-    payload = sanitize(text, 'sms')
-    assert payload is not None
-    assert payload.merchant is None
+    result = sanitize(text, 'sms')
+    assert result.payload is not None
+    assert result.payload.merchant is None

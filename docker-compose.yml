@@ -7,6 +7,9 @@
 #
 # Notes:
 #   - hermes-data volume persists SQLite and learned patterns across restarts.
+#   - forwarder-data volume persists the forwarder SQLite DB (forwarder.db).
+#   - pattern-inbox volume is shared between forwarder and hermes for proposal files.
+#     hermes writes proposals; forwarder validates and removes them.
 #   - Skills and config are bind-mounted read-only so edits take effect on restart.
 #
 
@@ -20,6 +23,7 @@ services:
     restart: unless-stopped
     volumes:
       - hermes-data:/opt/data
+      - pattern-inbox:/opt/data/pattern-inbox
       - ./skills:/opt/data/skills:ro
       - ./config/hermes.yaml:/opt/data/hermes.yaml:ro
       - ./config/hermes.yaml:/app/hermes.yaml:ro
@@ -36,6 +40,8 @@ services:
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       - TELEGRAM_ALLOWED_USERS=${TELEGRAM_CHAT_ID}
       - HERMES_GATEWAY_SECRET=${HERMES_GATEWAY_SECRET}
+      - HUSHMONEY_INBOX=/opt/data/pattern-inbox
+      - HUSHMONEY_REGISTRY=/opt/data/pattern-inbox/registry.json
     init: true
     ports:
       - "8081:8080"
@@ -46,6 +52,8 @@ services:
     restart: unless-stopped
     volumes:
       - ./config/hermes.yaml:/app/config/hermes.yaml:ro
+      - forwarder-data:/app/data
+      - pattern-inbox:/app/pattern-inbox
     environment:
       - HERMES_GATEWAY_URL=http://hermes:8080/gateway
       - HERMES_GATEWAY_SECRET=${HERMES_GATEWAY_SECRET}
@@ -58,6 +66,9 @@ services:
       - IMAP_MAILBOX=${IMAP_MAILBOX:-INBOX}
       - BANK_SENDER_EMAILS=${BANK_SENDER_EMAILS}
       - POLL_INTERVAL_SECONDS=${POLL_INTERVAL_SECONDS:-300}
+      - FORWARDER_DB_PATH=/app/data/forwarder.db
+      - FORWARDER_INBOX_DIR=/app/pattern-inbox
+      - HERMES_WEBHOOK_URL=http://hermes:8080/telegram
     depends_on:
       - hermes
 
@@ -80,3 +91,5 @@ services:
 
 volumes:
   hermes-data:
+  forwarder-data:
+  pattern-inbox:
