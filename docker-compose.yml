@@ -11,6 +11,9 @@
 #   - pattern-inbox volume is shared between forwarder and hermes for proposal files.
 #     hermes writes proposals; forwarder validates and removes them.
 #   - Skills and config are bind-mounted read-only so edits take effect on restart.
+#   - sqlite-web-hermes (8082) and sqlite-web-forwarder (8083) expose the DBs on
+#     localhost-only ports. Access via SSH tunnel:
+#     ssh -L 8082:localhost:8082 -L 8083:localhost:8083 user@host
 #
 
 services:
@@ -40,6 +43,7 @@ services:
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       - TELEGRAM_ALLOWED_USERS=${TELEGRAM_CHAT_ID}
       - HERMES_GATEWAY_SECRET=${HERMES_GATEWAY_SECRET}
+      - HUSHMONEY_DB=/opt/data/hushmoney.db
       - HUSHMONEY_INBOX=/opt/data/pattern-inbox
       - HUSHMONEY_REGISTRY=/opt/data/pattern-inbox/registry.json
     init: true
@@ -88,6 +92,29 @@ services:
       - PYTHONUNBUFFERED=1
     depends_on:
       - forwarder
+
+  # Read-only SQLite web UIs — localhost only, never exposed externally.
+  # Access via SSH tunnel:
+  #   ssh -L 8082:localhost:8082 -L 8083:localhost:8083 user@host
+  # hermes (8082): transactions, accounts, debts
+  # forwarder (8083): learned patterns
+  sqlite-web-hermes:
+    image: coleifer/sqlite-web
+    restart: unless-stopped
+    command: sqlite_web --host 0.0.0.0 --port 8080 --read-only /data/hushmoney.db
+    volumes:
+      - hermes-data:/data:ro
+    ports:
+      - "127.0.0.1:8082:8080"
+
+  sqlite-web-forwarder:
+    image: coleifer/sqlite-web
+    restart: unless-stopped
+    command: sqlite_web --host 0.0.0.0 --port 8080 --read-only /data/forwarder.db
+    volumes:
+      - forwarder-data:/data:ro
+    ports:
+      - "127.0.0.1:8083:8080"
 
 volumes:
   hermes-data:
