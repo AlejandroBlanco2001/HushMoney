@@ -32,6 +32,7 @@ from lib import api, models as _models
 
 REPO_ROOT = _models.REPO_ROOT
 RESULTS_FILE = Path(__file__).parent / "results.json"
+GOLDEN_FILE = REPO_ROOT / "skills/categorizer/evals/golden.jsonl"
 MODELS = _models.MODELS
 
 CATEGORIES = [
@@ -39,124 +40,33 @@ CATEGORIES = [
     "shopping", "services", "transfers", "cash", "other",
 ]
 
+THRESHOLD = 0.80  # eval fails if overall accuracy drops below this
+
 
 # ── Fixtures ───────────────────────────────────────────────────────────────────
-# Each fixture has:
-#   merchant        — normalized bank-emitted string
-#   payload         — clean transaction payload
-#   expected        — correct category slug, or "needs_clarification"
-#   label           — human-readable description for the report
 
 @dataclass
 class Fixture:
     name: str
-    merchant: str
+    merchant: str | None
     payload: dict[str, Any]
-    expected: str  # slug or "needs_clarification"
+    expected: str  # category slug or "needs_clarification"
 
 
-FIXTURES: list[Fixture] = [
-    # ── Unambiguous: should be categorized directly ───────────────────────────
-    Fixture(
-        name="netflix_subscription",
-        merchant="NETFLIX",
-        payload={"amount": 17900, "currency": "COP", "merchant": "NETFLIX",
-                 "transaction_type": "debit", "account_type": "credit", "channel": "email"},
-        expected="entertainment",
-    ),
-    Fixture(
-        name="uber_rides",
-        merchant="UBER RIDES",
-        payload={"amount": 32500, "currency": "COP", "merchant": "UBER RIDES",
-                 "transaction_type": "debit", "account_type": "checking", "channel": "sms"},
-        expected="transport",
-    ),
-    Fixture(
-        name="mcd_fast_food",
-        merchant="MCD",
-        payload={"amount": 28000, "currency": "COP", "merchant": "MCD",
-                 "transaction_type": "debit", "account_type": "checking", "channel": "sms"},
-        expected="food",
-    ),
-    Fixture(
-        name="spotify_subscription",
-        merchant="SPOTIFY",
-        payload={"amount": 14900, "currency": "COP", "merchant": "SPOTIFY",
-                 "transaction_type": "debit", "account_type": "credit", "channel": "email"},
-        expected="entertainment",
-    ),
-    Fixture(
-        name="smartfit_gym",
-        merchant="SMARTFIT",
-        payload={"amount": 89900, "currency": "COP", "merchant": "SMARTFIT",
-                 "transaction_type": "debit", "account_type": "checking", "channel": "email"},
-        expected="health",
-    ),
-    Fixture(
-        name="atm_cash_withdrawal",
-        merchant="CAJERO BANCOLOMBIA",
-        payload={"amount": 200000, "currency": "COP", "merchant": "CAJERO BANCOLOMBIA",
-                 "transaction_type": "cash", "account_type": "checking", "channel": "sms"},
-        expected="cash",
-    ),
-    Fixture(
-        name="transfer_out",
-        merchant=None,
-        payload={"amount": 150000, "currency": "COP", "merchant": None,
-                 "transaction_type": "transfer_out", "account_type": "checking", "channel": "sms"},
-        expected="transfers",
-    ),
-    Fixture(
-        name="claro_telecom",
-        merchant="CLARO",
-        payload={"amount": 55000, "currency": "COP", "merchant": "CLARO",
-                 "transaction_type": "debit", "account_type": "checking", "channel": "sms"},
-        expected="services",
-    ),
-    Fixture(
-        name="exito_supermarket",
-        merchant="EXITO",
-        payload={"amount": 87600, "currency": "COP", "merchant": "EXITO",
-                 "transaction_type": "debit", "account_type": "checking", "channel": "sms"},
-        expected="food",
-    ),
-    Fixture(
-        name="alkosto_electronics",
-        merchant="ALKOSTO",
-        payload={"amount": 1250000, "currency": "COP", "merchant": "ALKOSTO",
-                 "transaction_type": "debit", "account_type": "credit", "channel": "email"},
-        expected="shopping",
-    ),
-    # ── Ambiguous: should trigger needs_clarification ─────────────────────────
-    Fixture(
-        name="rappi_ambiguous",
-        merchant="RAPPI",
-        payload={"amount": 47350, "currency": "COP", "merchant": "RAPPI",
-                 "transaction_type": "debit", "account_type": "checking", "channel": "sms"},
-        expected="needs_clarification",
-    ),
-    Fixture(
-        name="pexto_capital_gateway",
-        merchant="PEXTO CAPITAL SAS",
-        payload={"amount": 120000, "currency": "COP", "merchant": "PEXTO CAPITAL SAS",
-                 "transaction_type": "payment", "account_type": "checking", "channel": "sms"},
-        expected="needs_clarification",
-    ),
-    Fixture(
-        name="amazon_ambiguous",
-        merchant="AMAZON",
-        payload={"amount": 35000, "currency": "COP", "merchant": "AMAZON",
-                 "transaction_type": "debit", "account_type": "credit", "channel": "email"},
-        expected="needs_clarification",
-    ),
-    Fixture(
-        name="payu_gateway",
-        merchant="PAYU COLOMBIA",
-        payload={"amount": 89000, "currency": "COP", "merchant": "PAYU COLOMBIA",
-                 "transaction_type": "payment", "account_type": "credit", "channel": "email"},
-        expected="needs_clarification",
-    ),
-]
+def load_fixtures() -> list[Fixture]:
+    fixtures = []
+    for line in GOLDEN_FILE.read_text().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        row = json.loads(line)
+        fixtures.append(Fixture(
+            name=row["name"],
+            merchant=row.get("merchant"),
+            payload=row["payload"],
+            expected=row["expected"],
+        ))
+    return fixtures
 
 
 # ── Prompt ─────────────────────────────────────────────────────────────────────
@@ -217,9 +127,11 @@ def call_model(api_key: str, model_id: str, fixture: Fixture) -> dict[str, Any]:
 # ── Run ────────────────────────────────────────────────────────────────────────
 
 def run(model_filter: str | None = None, dry_run: bool = False) -> None:
+    fixtures = load_fixtures()
+
     if dry_run:
-        print(f"[dry-run] {len(FIXTURES)} fixtures\n")
-        for f in FIXTURES:
+        print(f"[dry-run] {len(fixtures)} fixtures (from {GOLDEN_FILE.relative_to(REPO_ROOT)})\n")
+        for f in fixtures:
             print(f"  {f.name:<40} expected={f.expected}")
         return
 
@@ -235,19 +147,14 @@ def run(model_filter: str | None = None, dry_run: bool = False) -> None:
         sys.exit(1)
 
     cases = [
-        {
-            "fixture": f.name,
-            "merchant": f.merchant,
-            "expected": f.expected,
-            "models": {},
-        }
-        for f in FIXTURES
+        {"fixture": f.name, "merchant": f.merchant, "expected": f.expected, "models": {}}
+        for f in fixtures
     ]
 
     for model in models:
         print(f"\n{model['label']}")
         print("-" * 50)
-        for i, fixture in enumerate(FIXTURES):
+        for i, fixture in enumerate(fixtures):
             try:
                 result = call_model(api_key, model["id"], fixture)
                 cases[i]["models"][model["key"]] = result
@@ -293,8 +200,10 @@ def score(cases: list[dict] | None = None) -> None:
     print(f"CATEGORIZER EVAL  ({total} fixtures: {len(unambiguous)} unambiguous, {len(ambiguous)} ambiguous)")
     print(f"{'=' * 72}\n")
 
-    print(f"  {'Model':<28} {'Overall':>7}  {'Unambiguous':>11}  {'Clarification':>13}  {'$/1K':>8}")
-    print(f"  {'-' * 70}")
+    print(f"  {'Model':<28} {'Overall':>7}  {'Unambiguous':>11}  {'Clarification':>13}  {'$/1K':>8}  {'Pass':>5}")
+    print(f"  {'-' * 76}")
+
+    failed_models: list[str] = []
 
     for model in models:
         key = model["key"]
@@ -310,13 +219,18 @@ def score(cases: list[dict] | None = None) -> None:
             eligible = [c for c in subset if key in c["models"] and not c["models"][key].get("error")]
             return len(hits) / len(eligible) if eligible else float("nan")
 
+        overall = acc(model_cases)
         avg_in  = sum(c["models"][key]["input_tokens"]  for c in model_cases) / len(model_cases)
         avg_out = sum(c["models"][key]["output_tokens"] for c in model_cases) / len(model_cases)
         cost = (avg_in / 1_000_000) * model["input_per_m"] + (avg_out / 1_000_000) * model["output_per_m"]
+        passes = overall >= THRESHOLD
+        if not passes:
+            failed_models.append(model["label"])
 
         print(
-            f"  {model['label']:<28} {acc(model_cases):>7.1%}  "
+            f"  {model['label']:<28} {overall:>7.1%}  "
             f"{acc(unambiguous):>11.1%}  {acc(ambiguous):>13.1%}  ${cost * 1000:>7.4f}"
+            f"  {'✓' if passes else '✗ FAIL':>5}"
         )
 
     print(f"\n  {'Fixture':<40} {'Expected':<22}", end="")
@@ -341,6 +255,10 @@ def score(cases: list[dict] | None = None) -> None:
         print()
 
     print()
+
+    if failed_models:
+        print(f"FAILED: {', '.join(failed_models)} below {THRESHOLD:.0%} threshold", file=sys.stderr)
+        sys.exit(1)
 
 
 # ── Entry ──────────────────────────────────────────────────────────────────────
