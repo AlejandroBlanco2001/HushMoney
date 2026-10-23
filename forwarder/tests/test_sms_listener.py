@@ -16,6 +16,7 @@ ENV = {
     "BOT_USERNAME": BOT_USERNAME,
     "TELEGRAM_CHAT_ID": str(MY_ID),
     "TELEGRAM_SESSION_STRING": "fake",
+    "TELEGRAM_WEBHOOK_SECRET": "test-secret",
 }
 
 
