@@ -34,6 +34,7 @@ Resolve the period from the user's message or the cron trigger:
 - "esta semana" / "this week" → `--period week`
 - "este mes" / "this month" / monthly cron → `--period month`
 - Custom range → `--from YYYY-MM-DD --to YYYY-MM-DD`
+- No qualifier (e.g. "how much did I spend?") → `--period month`
 
 Run:
 ```
@@ -41,7 +42,8 @@ python3 /root/.hermes/skills/hushmoney/summaries/scripts/query_transactions.py \
   --period <period>
 ```
 
-Transfer-in transactions are excluded by default (not spending).
+`transfer_in` is excluded by default (money arriving is not spending).
+`transfer_out` **counts as spending** — money left the account. Never add it to `--exclude-types`.
 
 ### Step 2 — Format the response
 
@@ -85,5 +87,6 @@ Rules:
 
 - Never invent transactions — only report what `query_transactions.py` returns.
 - Do not add different currencies into a single total.
+- Do not exclude `transfer_out` from spending queries. A transfer out is outgoing money and counts as spending.
 - If `query_transactions.py` errors (DB missing), reply:
   > "No transactions recorded yet. I'll start tracking once your first bank notification arrives."
