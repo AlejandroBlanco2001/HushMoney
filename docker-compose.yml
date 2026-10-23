@@ -103,7 +103,7 @@ services:
     restart: unless-stopped
     command: sqlite_web --host 0.0.0.0 --port 8080 --read-only /data/hushmoney.db
     volumes:
-      - hermes-data:/data:ro
+      - hermes-data:/data
     ports:
       - "127.0.0.1:8082:8080"
 
@@ -112,11 +112,17 @@ services:
     restart: unless-stopped
     command: sqlite_web --host 0.0.0.0 --port 8080 --read-only /data/forwarder.db
     volumes:
-      - forwarder-data:/data:ro
+      - forwarder-data:/data
     ports:
       - "127.0.0.1:8083:8080"
 
 volumes:
   hermes-data:
+    external: true
+    name: untyped_hermes-data
   forwarder-data:
+    external: true
+    name: untyped_forwarder-data
   pattern-inbox:
+    external: true
+    name: untyped_pattern-inbox
