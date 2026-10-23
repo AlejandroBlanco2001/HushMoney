@@ -89,8 +89,6 @@ def _build_url(settings: dict[str, object], key: str) -> str:
         raise ValueError(f'forwarder.telegram.{key} must be a valid HTTP URL') from None
     if not valid:
         raise ValueError(f'forwarder.telegram.{key} must be an HTTP URL without credentials')
-    if key == 'hermes_webhook_url' and parsed.path != '/telegram':
-        raise ValueError('Hermes webhook path must be /telegram')
     return value
 
 

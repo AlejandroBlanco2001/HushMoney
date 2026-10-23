@@ -141,13 +141,11 @@ class UnmatchedHandler:
     def _post(self, body: Mapping[str, object]) -> None:
         import httpx
 
+        text = (body.get('message') or {}).get('text', '')  # type: ignore[union-attr]
+        if not text:
+            return
         try:
-            resp = httpx.post(
-                self._hermes_url,
-                json=body,
-                headers={'X-Telegram-Bot-Api-Secret-Token': self._webhook_secret},
-                timeout=10,
-            )
+            resp = httpx.post(self._hermes_url, json={'text': text}, timeout=10)
             resp.raise_for_status()
         except Exception:
             log.warning('unmatched: failed to forward to hermes')
@@ -251,11 +249,7 @@ class UnmatchedHandler:
         }
         try:
             assert isinstance(client, httpx.AsyncClient)
-            resp = await client.post(
-                self._hermes_url,
-                json=body,
-                headers={'X-Telegram-Bot-Api-Secret-Token': self._webhook_secret},
-            )
+            resp = await client.post(self._hermes_url, json={'text': header})
             resp.raise_for_status()
             log.info('unmatched forwarded fingerprint=%s bank=%s', fp, bank_slug)
         except Exception:

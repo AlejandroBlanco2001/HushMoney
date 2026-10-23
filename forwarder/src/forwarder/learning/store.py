@@ -255,9 +255,9 @@ class PatternStore:
             conn.execute(
                 """UPDATE fingerprints
                    SET state = ?, hits = hits + 1, last_seen = ?,
-                       last_forwarded = COALESCE(?, last_forwarded), updated_at_unused = ?
+                       last_forwarded = COALESCE(?, last_forwarded)
                    WHERE fingerprint = ?""",
-                (state, now, last_forwarded, now, fp),
+                (state, now, last_forwarded, fp),
             )
         else:
             conn.execute(

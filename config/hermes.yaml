@@ -29,7 +29,7 @@ forwarder:
     port: 9000
     timeout_seconds: 15
     gateway_url: "http://hermes:8080/gateway"
-    hermes_webhook_url: "http://hermes:8443/telegram"
+    hermes_webhook_url: "http://sms-listener:9001/inject"
 
 summaries:
   daily:
