@@ -3,7 +3,9 @@ title: Architecture
 description: System overview, data flows, and component responsibilities.
 ---
 
-HushMoney is a **single-user, self-hosted** deployment. One EC2 instance runs for one person. There is no multi-tenancy, no shared infrastructure, no centralized service. You own the bot token, the Gmail account, the EC2 instance, and the SQLite database.
+HushMoney is a **single-user, self-hosted** deployment. One EC2 instance runs for one person.
+There is no multi-tenancy, no shared infrastructure, no centralized service. You own the bot
+token, the Gmail account, the EC2 instance, and the SQLite database.
 
 ## System overview
 
@@ -28,17 +30,29 @@ HushMoney is a **single-user, self-hosted** deployment. One EC2 instance runs fo
          ┌───────────────────────────────┐
          │           Forwarder           │
          │                               │
-         │   sanitizer/ — strips OTPs,   │
-         │   account numbers, PII        │
+         │  sanitizer/ — strips OTPs,    │
+         │  account numbers, PII         │
          │                               │
-         │   CleanPayload:               │
-         │   { amount, currency,         │
-         │     merchant, date,           │
-         │     transaction_type,         │
-         │     account_type, channel }   │
-         └──────────────┬────────────────┘
-                        │ HTTP POST
-                        ▼
+         │  matched → CleanPayload:      │
+         │  { amount, currency,          │
+         │    merchant, date, type,      │
+         │    account_type, channel,     │
+         │    template_id }              │
+         │                               │
+         │  unmatched (financial only) → │
+         │  UnmatchedHandler             │
+         │  (dedup · rate-limit)         │
+         │                               │
+         │  InboxWatcher (daemon thread) │
+         │  ← validates pattern proposals│
+         │                               │
+         │  forwarder.db (SQLite)        │
+         │  pattern-inbox/ (volume)      │
+         └──────┬───────────────┬────────┘
+                │ HTTP POST      │ HTTP POST
+                │ CleanPayload   │ [bank_learning] header
+                │                │ + redacted text
+                ▼                ▼
          ┌───────────────────────────────┐
          │        Hermes Agent           │
          │                               │
@@ -48,6 +62,8 @@ HushMoney is a **single-user, self-hosted** deployment. One EC2 instance runs fo
          │   ├── debt_tracker            │
          │   ├── summaries               │
          │   └── bank_learning           │
+         │       (writes proposals to    │
+         │        pattern-inbox/)        │
          │                               │
          │   ┌─────────┐                 │
          │   │ SQLite  │ persistent mem  │
@@ -55,10 +71,8 @@ HushMoney is a **single-user, self-hosted** deployment. One EC2 instance runs fo
          │                               │
          │   Model: Nemotron 3 Nano      │
          │   via Nebius Serverless       │
-         │                               │
-         │   Sandbox: NVIDIA OpenShell   │
          └──────────────┬────────────────┘
-                        │ (cash operations only)
+                        │
                         ▼
                Telegram → you
 ```
@@ -67,30 +81,45 @@ HushMoney is a **single-user, self-hosted** deployment. One EC2 instance runs fo
 
 ### Forwarder
 
-Stateless Python 3.12 service with two intake channels:
+Python 3.12 service with two intake channels and a pattern learning subsystem:
 
 | Module | Responsibility |
 |---|---|
-| `imap.py` | Polls Gmail every 5 min, parses RFC 822 messages, resolves original sender for forwarded emails |
-| `channels/telegram.py` | Receives webhook updates from the Telegram bot (user-forwarded SMS via Pyrogram) |
-| `sanitizer/` | Strips OTPs, account numbers, card suffixes, PII — emits a `CleanPayload` |
-| `hermes.py` | HTTP POSTs the `CleanPayload` to `gateway_server.py` |
+| `imap.py` | Polls Gmail every 5 min, parses RFC 822 messages |
+| `channels/telegram.py` | Receives webhook updates from the Telegram bot (SMS forwarded by Pyrogram) |
+| `sanitizer/` | Strips PII; emits `SanitizeResult` with status, redacted text, and optional `CleanPayload` |
+| `sanitizer/registry.py` | Loads community YAML patterns and merges learned patterns from SQLite; hot-reloads every 2 s |
+| `learning/store.py` | SQLite pattern store (`forwarder.db`) with thread-local connections and WAL mode |
+| `learning/inbox.py` | Daemon thread watching `pattern-inbox/proposals/`; validates and inserts candidate patterns |
+| `learning/unmatched.py` | Deduplicates and rate-limits unmatched financial notifications before forwarding to Hermes |
+| `hermes.py` | HTTP POSTs `CleanPayload` to `gateway_server.py` |
 
-The forwarder holds no state, no database, no retry queue. If dispatch fails, the message is dropped — financial notifications are ephemeral.
+The forwarder maintains its own SQLite database (`forwarder.db`) for pattern storage — separate
+from Hermes's database and not accessible from the Hermes container.
 
 ### Hermes Agent
 
-[Hermes Agent](https://hermes-agent.nousresearch.com) by NousResearch, running inside a Docker container with an HTTP gateway server (`gateway_server.py`) that receives `CleanPayload` messages and forwards them to the agent.
+[Hermes Agent](https://hermes-agent.nousresearch.com) by NousResearch, running inside a Docker
+container with an HTTP gateway server (`gateway_server.py`) that receives `CleanPayload` messages
+and bank learning requests.
 
-The agent uses **NVIDIA Nemotron 3 Nano** (`nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B`) served via Nebius Serverless Endpoints for all LLM inference. Nemotron's MoE architecture (3B active / 30B total) keeps latency low for frequent categorization calls while retaining quality for reasoning tasks.
+The agent uses **NVIDIA Nemotron 3 Nano** (`nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B`) served via
+Nebius Serverless Endpoints for all LLM inference. Nemotron's MoE architecture (3B active / 30B
+total) keeps latency low for frequent categorization calls while retaining quality for reasoning tasks.
 
 ### SMS Listener
 
-`sms-listener` is a Pyrogram user client logged in as your Telegram account. It watches your Saved Messages (self-chat) for new text matching bank notification patterns and forwards them to the forwarder's Telegram channel.
+`sms-listener` is a Pyrogram user client logged in as your Telegram account. It watches your
+Saved Messages (self-chat) for new text matching bank notification patterns and forwards them to
+the forwarder's Telegram webhook.
 
-### SQLite
+### Storage
 
-All transaction data, debt records, learned bank patterns, and user settings are stored in a single SQLite file, persisted in the `hermes-data` Docker volume on EC2.
+| Volume | Contents | Accessible by |
+|--------|----------|---------------|
+| `hermes-data` | Hermes SQLite (transactions, categories, debts, settings) | Hermes only |
+| `forwarder-data` | `forwarder.db` (learned patterns, fingerprints, proposals log) | Forwarder only |
+| `pattern-inbox` | Proposal JSON files written by Hermes, consumed by the forwarder | Both (Hermes writes, forwarder reads/deletes) |
 
 ## Infrastructure
 
@@ -99,5 +128,5 @@ All transaction data, debt records, learned bank patterns, and user settings are
 | EC2 instance | t3.small, Amazon Linux 2023, Elastic IP |
 | Container runtime | Docker Compose (3 services: hermes, forwarder, sms-listener) |
 | LLM inference | Nebius Serverless — no GPU on the instance |
-| Database | SQLite on the hermes-data volume |
+| Database | Two SQLite databases: `hermes-data` and `forwarder-data` volumes |
 | Sandbox | NVIDIA OpenShell (optional, requires kernel 6.2+) |

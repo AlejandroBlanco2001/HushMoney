@@ -3,7 +3,8 @@ title: Security & Privacy
 description: How HushMoney keeps your financial data private.
 ---
 
-HushMoney is built around a single principle: **raw financial data never reaches the AI model**. The forwarder enforces a hard sanitization boundary before anything touches Hermes.
+HushMoney is built around a single principle: **raw financial data never reaches the AI model**.
+The forwarder enforces a hard sanitization boundary before anything touches Hermes.
 
 ## The privacy boundary
 
@@ -13,13 +14,24 @@ Bank notification (raw)
         ▼
    Forwarder sanitizer   ← PII stripped here
         │
-        ▼
-   CleanPayload          ← only this crosses the boundary
-   { amount, merchant,
-     date, type, channel }
+        ├─── matched ──────────────────────────────────┐
+        │                                              ▼
+        │                                    CleanPayload
+        │                                    { amount, merchant,
+        │                                      date, type, channel }
+        │                                              │
+        │                                              ▼
+        │                                    Hermes Agent + Nemotron
         │
-        ▼
-   Hermes Agent + NVIDIA Nemotron
+        └─── unmatched (financial only) ───────────────┐
+                                                       ▼
+                                             [bank_learning] header
+                                             + redacted text only
+                                             (no amounts, no names)
+                                                       │
+                                                       ▼
+                                             Hermes Agent asks you
+                                             to confirm expected values
 ```
 
 Everything stripped before crossing the boundary:
@@ -35,14 +47,40 @@ Everything stripped before crossing the boundary:
 The agent never receives and never stores:
 
 - Raw email bodies or SMS text
+- Actual amounts or merchant names from unmatched notifications
 - Full account numbers (only the last 4 digits, when needed for account matching)
 - OTPs or security codes
 - Transfer recipient names
 - Any content that could identify a third party
 
+## Bank learning — no raw data exception
+
+Unlike earlier versions, bank learning no longer requires Hermes to access raw content.
+The forwarder sanitizes the text **before** forwarding it to the agent. What Hermes receives
+for an unmatched notification is:
+
+```
+[bank_learning]
+reason: no_template
+channel: sms
+bank: bancolombia
+fingerprint: a1b2c3d4e5f6a7b8
+---
+Bancolombia: Transferiste $[REDACTED] desde tu cuenta *[REDACTED] a la cuenta
+*[REDACTED] el [REDACTED] a las [REDACTED].
+```
+
+The agent then asks you to confirm the expected amount and date. Those values come
+**only from your reply**, never from the redacted text. This means:
+
+- No raw financial content ever reaches the model
+- Proposal files store only a synthetic sample (`12345.67` / `COMERCIO PRUEBA`), not real values
+- The forwarder database (`forwarder.db`) never contains actual transaction values from learning sessions
+
 ## OpenShell sandbox
 
-When running with `--with-openshell`, the Hermes container operates under three kernel-level enforcement layers:
+When running with `--with-openshell`, the Hermes container operates under three
+kernel-level enforcement layers:
 
 | Layer | Mechanism | What it enforces |
 |---|---|---|
@@ -50,19 +88,11 @@ When running with `--with-openshell`, the Hermes container operates under three 
 | Syscalls | Seccomp BPF | Blocks all system calls not on the allowlist |
 | Network egress | OPA proxy | Agent can only reach Nebius API and Telegram endpoints |
 
-The Nebius API key is managed by OpenShell and injected at the policy layer — it never appears inside the container environment.
+The Nebius API key is managed by OpenShell and injected at the policy layer — it never
+appears inside the container environment.
 
-## Bank learning exception
-
-The bank learning skill in **reactive mode** is the single documented exception to the privacy boundary rule. When a notification arrives from an unknown bank, Hermes briefly accesses the raw message to infer a parsing pattern.
-
-Constraints that must be enforced:
-
-- The raw content is passed to the NVIDIA model for structural inference only
-- The model prompt instructs it to return structure only (positions, delimiters, formats) — not values
-- The raw content is **never stored, never logged, never written to SQLite**
-- Once the pattern is confirmed and saved, all future messages from that bank are sanitized before Hermes sees them
-- If the user declines to confirm the inferred transaction, the raw content is discarded and the transaction is dropped
+The `forwarder.db` volume is **not mounted** in the Hermes container — the agent cannot
+read or write the pattern store directly.
 
 ## Self-hosted by design
 

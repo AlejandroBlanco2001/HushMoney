@@ -1,82 +1,122 @@
 ---
 title: Bank Learning
-description: Teach Hermes new bank notification formats interactively — no code required.
+description: Teach HushMoney new bank notification formats — automatically, without pasting raw data.
 ---
 
-The sanitizer ships with parsing patterns for a set of supported banks. When a notification arrives from an unsupported bank, the bank learning skill takes over and teaches Hermes the new format interactively.
+The forwarder ships with community patterns for supported banks. When a notification arrives
+that no pattern can parse, the bank learning skill closes the loop automatically — no manual
+intervention required.
 
-## How patterns work
-
-The sanitizer uses a two-layer fallback:
+## How the loop works
 
 ```
 Notification arrives
         │
         ▼
-① Community patterns   ← compiled from the repo at deploy time
-        │ no match
-        ▼
-② Learned patterns     ← stored in SQLite, discovered at runtime
-        │ no match
-        ▼
-   bank_learning skill  ← asks you, infers the pattern, updates layer ②
+   Forwarder sanitizer   ← redacts OTPs, account numbers, PII
+        │
+        ├─ matched → dispatch to Hermes (normal flow)
+        │
+        └─ unmatched ──────────────────────────────────┐
+                                                       ▼
+                                          Unmatched handler
+                                          • fingerprints the text
+                                          • deduplicates (7-day window)
+                                          • rate-limits (10/hour)
+                                                       │
+                                                       ▼
+                                          Hermes receives message with
+                                          [bank_learning] header +
+                                          redacted text only
+                                                       │
+                                                       ▼
+                                          Agent asks you to confirm
+                                          the expected values, then
+                                          writes a proposal file
+                                                       │
+                                                       ▼
+                                          Inbox watcher validates,
+                                          inserts candidate pattern
+                                                       │
+                                                       ▼
+                                          Forwarder hot-reloads (≤2s)
+                                          and starts matching
 ```
 
-Once a pattern is learned, all future notifications from that bank are sanitized automatically.
+The forwarder's sanitizer **always runs first**. Hermes never receives raw financial content —
+only already-redacted text with `[REDACTED]` placeholders.
 
-## Reactive learning (automatic)
+## Pattern lifecycle
 
-When both layers fail, Hermes asks you to help:
+| Status | Meaning |
+|--------|---------|
+| **Candidate** 🧪 | Newly accepted; used tentatively |
+| **Active** | Promoted after 3 distinct correct uses over 24 h |
+| **Rejected** | Received a "wrong" feedback verdict |
+
+Transactions processed by a candidate pattern are marked 🧪 in your Telegram notification
+so you can spot-check them. Once a pattern reaches **active**, the marker disappears.
+
+## What a learning session looks like
+
+When an unmatched notification arrives, Hermes opens the session:
 
 ```
-Hermes: I got a notification I couldn't parse.
-        Which bank sent it?
+Hermes: I got an SMS I couldn't parse from Bancolombia.
 
-You: Davivienda
+        Here's what I can see from the structure:
+        This looks like a transfer_out from a checking account.
+        To validate the pattern I need the original values:
+        • Amount (number only, e.g. 45000.50)
+        • Date (e.g. 2026-10-20T19:06:00Z)
 
-Hermes: [infers structure using NVIDIA Nemotron via Nebius]
-        I think this is a debit purchase of $85,000 at Éxito
-        on 14/09/2026. Correct?
+You: 1000, 2026-10-20T19:06:00Z
 
-You: yes
-
-Hermes: Pattern saved. I'll recognize Davivienda messages from now on.
+Hermes: Submitting pattern… ✅ accepted as candidate.
+        The next 3 transactions from this format will be
+        marked 🧪. Let me know if they look wrong.
 ```
 
-## Proactive learning (add a bank before its first notification)
+## Privacy guarantees
+
+- The text Hermes receives is already redacted — amounts, account numbers, and names are
+  replaced with `[REDACTED]` before leaving the forwarder.
+- Expected values (amount, date) come **only from your reply** — Hermes never infers them
+  from the redacted text.
+- The raw notification is never stored, never logged, and never forwarded anywhere.
+- Proposal files are deleted from disk as soon as the forwarder processes them.
+
+## Validation gates
+
+Before a proposed pattern becomes a candidate the forwarder runs three checks:
+
+| Gate | What it verifies |
+|------|----------------|
+| **Static** | Compiles, ≤ 400 chars, has `(?P<amount>...)`, no unbounded wildcards outside merchant |
+| **Sample match** | Regex matches the redacted sample; captured amount equals the value you confirmed |
+| **Collision** | Pattern doesn't also match an existing template for the same bank |
+
+Rejection details are reported back to the agent so it can correct and resubmit.
+
+## Adding a bank proactively
+
+If you want to add a bank before its first notification arrives, message your bot:
 
 ```
 You: hermes add-bank
 
-Hermes: Which bank? Which country?
+Hermes: Which bank and country?
 
 You: Davivienda, Colombia
 
-Hermes: Send me 2–3 sample notifications from Davivienda.
-        Redact sensitive info first:
-        • Replace account numbers with XXXX
-        • Replace names with NAME
-        • Replace amounts with XX.XXX,XX
-        • Replace OTPs with 000000
+Hermes: Send me a redacted sample notification — replace amounts with XX.XXX,XX,
+        account numbers with XXXX, and names with NAME.
 
-You: [pastes 2–3 redacted samples]
+You: [pastes redacted sample]
 
-Hermes: Pattern saved. Here's what I detected:
-        • Amount: Colombian format ($XX.XXX,XX)
-        • Merchant: extracted from "Compraste X en MERCHANT"
-        • Strips: account suffix, phone numbers
-        Looks right?
+Hermes: Got it. What was the actual amount and date?
 
-You: yes
+You: 85000, 2026-09-14T12:00:00Z
+
+Hermes: ✅ Pattern submitted. I'll let you know if validation passes.
 ```
-
-## Privacy note
-
-In reactive mode, Hermes briefly accesses the raw pre-sanitization message to infer the pattern. This is the **single documented exception** to the privacy boundary rule. Constraints:
-
-- The raw content is passed to the NVIDIA model for structural inference only — never stored, never logged
-- The model is instructed to return structure only (field positions, delimiters, formats), not values
-- Once the pattern is saved, all future messages from that bank are sanitized before Hermes sees them
-- If you decline to confirm the inferred transaction, the raw content is discarded and the transaction is dropped
-
-See [Security](/security) for the full privacy model.

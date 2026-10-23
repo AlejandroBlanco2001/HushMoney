@@ -14,7 +14,7 @@ No manual entry. No spreadsheets. Just ask.
     An email or SMS arrives from your bank — a purchase confirmation, a transfer, a cash withdrawal.
   </Step>
   <Step title="Forwarder sanitizes it">
-    The forwarder strips OTPs, full account numbers, recipient names, and any other PII. Only a clean payload reaches the agent: amount, merchant, date, type.
+    The forwarder strips OTPs, full account numbers, recipient names, and any other PII. Matched notifications produce a clean payload (amount, merchant, date, type). Unmatched financial notifications are forwarded to the agent with redacted text so new patterns can be learned — raw values never cross the boundary.
   </Step>
   <Step title="Hermes Agent processes it">
     The agent runs on **NVIDIA Nemotron 3 Nano** via **Nebius Serverless**. It categorizes the transaction, stores it in SQLite, and optionally sends you a Telegram reminder for cash operations.
@@ -43,7 +43,7 @@ No manual entry. No spreadsheets. Just ask.
     Ask for a daily, weekly, or monthly breakdown at any time, or have them delivered automatically.
   </Card>
   <Card title="Bank learning" icon="graduation-cap">
-    Teach Hermes new bank notification formats interactively via Telegram — no code required.
+    Unmatched notifications auto-route to Hermes with redacted text. Confirm the values once; the pattern is live in under 2 seconds.
   </Card>
 </CardGroup>
 
