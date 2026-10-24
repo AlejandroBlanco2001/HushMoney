@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import time
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -15,19 +14,6 @@ log = logging.getLogger(__name__)
 
 LEARNING_RETRY_AFTER_DAYS = 7
 LEARNING_MAX_PER_HOUR = 10
-
-_forwarded_this_hour: list[float] = []
-
-
-def _check_rate_limit() -> bool:
-    now = time.monotonic()
-    cutoff = now - 3600
-    while _forwarded_this_hour and _forwarded_this_hour[0] < cutoff:
-        _forwarded_this_hour.pop(0)
-    if len(_forwarded_this_hour) >= LEARNING_MAX_PER_HOUR:
-        return False
-    _forwarded_this_hour.append(now)
-    return True
 
 
 def _status_to_reason(status: SanitizeStatus) -> str:
@@ -93,12 +79,13 @@ class UnmatchedHandler:
             if state == 'learned':
                 log.warning('unmatched fingerprint=%s state=learned (possible regression)', fp)
 
-        if not _check_rate_limit():
+        if self._store.forwards_last_hour() >= LEARNING_MAX_PER_HOUR:
             log.warning('unmatched rate limit reached, fingerprint=%s dropped', fp)
             self._store.upsert_fingerprint(fp, bank_slug, channel, 'pending')
             return fp, False, False
 
         now_iso = datetime.now(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')
+        self._store.record_forward()
         self._store.upsert_fingerprint(fp, bank_slug, channel, 'pending', last_forwarded=now_iso)
         return fp, True, False
 

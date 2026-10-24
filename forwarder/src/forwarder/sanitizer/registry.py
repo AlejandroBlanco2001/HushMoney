@@ -157,6 +157,10 @@ class PatternRegistry:
     def store(self) -> PatternStore | None:
         return self._store
 
+    def attach_store(self, store: PatternStore) -> None:
+        """Attach the learned-pattern store (injected by __main__ after DB init)."""
+        self._store = store
+
     def reload_if_changed(self) -> None:
         now = time.monotonic()
         with self._lock:

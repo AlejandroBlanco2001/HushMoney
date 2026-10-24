@@ -58,3 +58,12 @@ CREATE TABLE IF NOT EXISTS proposals (
     codes       TEXT NOT NULL,
     received_at TEXT NOT NULL
 );
+
+-- Append-only log of learning forwards, used to rate-limit per hour. Survives
+-- restarts (the previous in-memory counter did not). Pruned to the last hour on
+-- each insert.
+CREATE TABLE IF NOT EXISTS forward_log (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    forwarded_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_forward_log_ts ON forward_log(forwarded_at);

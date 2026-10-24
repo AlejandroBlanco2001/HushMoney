@@ -6,7 +6,7 @@ import re
 import sqlite3
 import threading
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from importlib.resources import files
 from pathlib import Path
 
@@ -261,6 +261,22 @@ class PatternStore:
             (state, now, fp),
         )
         conn.commit()
+
+    def record_forward(self) -> None:
+        cutoff = (datetime.now(UTC) - timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M:%SZ')
+        conn = self._conn()
+        conn.execute('INSERT INTO forward_log (forwarded_at) VALUES (?)', (_now_iso(),))
+        conn.execute('DELETE FROM forward_log WHERE forwarded_at < ?', (cutoff,))
+        conn.commit()
+
+    def forwards_last_hour(self) -> int:
+        cutoff = (datetime.now(UTC) - timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M:%SZ')
+        row = (
+            self._conn()
+            .execute('SELECT COUNT(*) FROM forward_log WHERE forwarded_at >= ?', (cutoff,))
+            .fetchone()
+        )
+        return int(row[0]) if row else 0
 
     def log_proposal(self, proposal_id: str, kind: str, outcome: str, codes: list[str]) -> None:
         self._conn().execute(

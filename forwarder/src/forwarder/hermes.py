@@ -10,12 +10,17 @@ from forwarder.sanitizer import CleanPayload
 log = logging.getLogger(__name__)
 
 
-def dispatch(payload: CleanPayload, gateway_url: str, gateway_secret: str) -> None:
+def _headers(gateway_secret: str) -> dict[str, str]:
     headers = {'Content-Type': 'application/json'}
     if gateway_secret:
         headers['Authorization'] = f'Bearer {gateway_secret}'
+    return headers
 
-    resp = httpx.post(gateway_url, json=payload.to_json(), headers=headers, timeout=15)
+
+def dispatch(payload: CleanPayload, gateway_url: str, gateway_secret: str) -> None:
+    resp = httpx.post(
+        gateway_url, json=payload.to_json(), headers=_headers(gateway_secret), timeout=15
+    )
     resp.raise_for_status()
     log.info('dispatched to hermes')
 
@@ -26,9 +31,8 @@ async def dispatch_async(
     gateway_secret: str,
     client: httpx.AsyncClient,
 ) -> None:
-    headers: dict[str, str] = {'Content-Type': 'application/json'}
-    if gateway_secret:
-        headers['Authorization'] = f'Bearer {gateway_secret}'
-    response = await client.post(gateway_url, json=payload.to_json(), headers=headers)
+    response = await client.post(
+        gateway_url, json=payload.to_json(), headers=_headers(gateway_secret)
+    )
     response.raise_for_status()
     log.info('dispatched to hermes')

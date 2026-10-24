@@ -9,7 +9,38 @@ from forwarder.sanitizer.banks import BankPatterns
 
 _SYNTHETIC_AMOUNT = 12345.67
 _SYNTHETIC_MERCHANT = 'COMERCIO PRUEBA'
-_SYNTHETIC_DATE_REPLACEMENT = ('01', '02', '2026', '10', '20', '00')
+_SYNTHETIC_DATE_PARTS = {
+    'day': '01',
+    'month': '02',
+    'year': '2026',
+    'hour': '10',
+    'minute': '20',
+    'second': '00',
+}
+
+
+def _synthesize_date(match: re.Match[str]) -> str:
+    """Rebuild a matched date string with synthetic values, per named group.
+
+    Locale-agnostic: it splices each named group's captured span (day/month/year/
+    hour/minute/second) rather than assuming a DD/MM HH:MM layout.
+    """
+    text = match.group(0)
+    base = match.start()
+    spans: list[tuple[int, int, str]] = []
+    for name, value in _SYNTHETIC_DATE_PARTS.items():
+        try:
+            start, end = match.span(name)
+        except IndexError:
+            continue  # group not present in this bank's date regex
+        if start < 0:
+            continue
+        if name == 'year' and (end - start) == 2:
+            value = value[-2:]  # two-digit year regex expects two digits
+        spans.append((start - base, end - base, value))
+    for start, end, value in sorted(spans, key=lambda s: s[0], reverse=True):
+        text = text[:start] + value + text[end:]
+    return text
 
 
 def _format_amount(amount: float, bank: BankPatterns) -> str:
@@ -44,16 +75,11 @@ def build_synthetic(
         synth_amount_str = _format_amount(_SYNTHETIC_AMOUNT, bank).lstrip('$')
         synth = synth.replace(raw_amount, synth_amount_str, 1)
 
-        # Replace date components in the sample
+        # Replace date components in the sample, using the bank's own named groups.
         date_match = re.search(bank.date.pattern, synth)
         if date_match:
             old_date = date_match.group(0)
-            day, month, year, hour, minute, _second = _SYNTHETIC_DATE_REPLACEMENT
-            new_date = old_date
-            new_date = re.sub(r'\b\d{4}\b', year, old_date, count=1)
-            new_date = re.sub(r'\b\d{2}/\d{2}', f'{day}/{month}', new_date, count=1)
-            new_date = re.sub(r'\b\d{2}:\d{2}', f'{hour}:{minute}', new_date, count=1)
-            synth = synth.replace(old_date, new_date, 1)
+            synth = synth.replace(old_date, _synthesize_date(date_match), 1)
 
         # Verify the synthetic sample matches the regex
         synth_match = _regex.search(regex_str, synth, timeout=0.1)
