@@ -143,15 +143,25 @@ def _sender_thread() -> None:
             print(f"Inject send failed: {exc}", flush=True)
 
 
-# --- startup: sync setup before app.run() ---
-_resolve_bot_sync()
+def main() -> None:
+    """Startup: sync setup, then run the Pyrogram client.
 
-# Capture the loop that app.run() will use — same as the main thread's default loop.
-_app_loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
+    Guarded by __main__ so importing this module (e.g. in tests) has no side
+    effects — no socket binding, no event-loop access, no app.run().
+    """
+    global _app_loop
+    _resolve_bot_sync()
 
-server = HTTPServer(('0.0.0.0', INJECT_PORT), _InjectHandler)
-Thread(target=server.serve_forever, daemon=True).start()
-Thread(target=_sender_thread, daemon=True).start()
-print(f"Inject server listening on 0.0.0.0:{INJECT_PORT}", flush=True)
+    # Capture the loop that app.run() will use — same as the main thread's default loop.
+    _app_loop = asyncio.get_event_loop()
 
-app.run()
+    server = HTTPServer(('0.0.0.0', INJECT_PORT), _InjectHandler)
+    Thread(target=server.serve_forever, daemon=True).start()
+    Thread(target=_sender_thread, daemon=True).start()
+    print(f"Inject server listening on 0.0.0.0:{INJECT_PORT}", flush=True)
+
+    app.run()
+
+
+if __name__ == '__main__':
+    main()

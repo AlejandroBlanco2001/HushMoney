@@ -173,7 +173,7 @@ def validate(
         if parsed_date is not None and abs((parsed_date - expected.date).total_seconds()) > 60:
             rejections.append(Rejection('date_mismatch', 'parsed date differs from expected'))
 
-    # ── Gate 4: Collision ─────────────────────────────────────────────────────
+    # ── Gate 3: Collision ─────────────────────────────────────────────────────
     for b in snapshot.banks:
         if b.name != bank_slug:
             continue

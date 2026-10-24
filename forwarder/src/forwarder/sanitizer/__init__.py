@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 import re
 from dataclasses import dataclass
 from enum import StrEnum
@@ -14,6 +15,8 @@ from forwarder.sanitizer.selector import BankSelector
 
 
 __all__ = ['CleanPayload', 'SanitizeResult', 'SanitizeStatus', 'sanitize', 'sanitize_push']
+
+log = logging.getLogger(__name__)
 
 _SUSPICIOUS_MERCHANT = re.compile(r'\d{4,}|@|https?:', re.IGNORECASE)
 
@@ -60,6 +63,7 @@ def sanitize_push(app_name: str, body: str, channel: Channel) -> tuple[CleanPayl
     payload = result.payload
     if payload.merchant is not None:
         payload = dataclasses.replace(payload, merchant=_normalize_merchant(payload.merchant))
+    _record_learned_use(result.template, payload)
     return payload, True
 
 
@@ -84,12 +88,36 @@ def sanitize(text: str, channel: Channel, *, sender: str | None = None) -> Sanit
     payload = result.payload
     if payload.merchant is not None:
         payload = dataclasses.replace(payload, merchant=_normalize_merchant(payload.merchant))
+    _record_learned_use(result.template, payload)
     return SanitizeResult(
         status=SanitizeStatus.MATCHED,
         redacted_text=clean_text,
         bank_slug=bank.name,
         payload=payload,
     )
+
+
+def _record_learned_use(template: object, payload: CleanPayload) -> None:
+    """Count a successful match of a learned pattern toward candidate promotion.
+
+    Community patterns are already active and are not tracked. No-op when the
+    registry has no store attached (e.g. community-only test contexts).
+    """
+    from forwarder.sanitizer.banks import TransactionPattern
+
+    if not isinstance(template, TransactionPattern):
+        return
+    if template.source != 'learned' or template.pattern_id is None:
+        return
+    store = REGISTRY.store
+    if store is None:
+        return
+    from forwarder.learning.lifecycle import track_use
+
+    try:
+        track_use(store, template.pattern_id, payload.amount, payload.merchant)
+    except Exception:  # usage tracking must never break parsing
+        log.warning('failed to record use of learned pattern %s', template.pattern_id)
 
 
 def _normalize_merchant(raw: str) -> str | None:

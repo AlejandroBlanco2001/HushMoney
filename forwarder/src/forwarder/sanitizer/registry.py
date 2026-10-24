@@ -122,14 +122,23 @@ def _build_snapshot(
     learned: tuple[BankPatterns, ...],
     store_version: str,
 ) -> RegistrySnapshot:
-    all_banks = community + learned
+    # `learned` already contains the merged form of any community bank it extends
+    # (community transactions + learned ones), so a learned entry must *replace* the
+    # base community entry of the same name — not sit alongside it. Otherwise SMS
+    # selection, which scans this list in order, would pick the base copy first and
+    # never see the learned patterns.
+    by_name: dict[str, BankPatterns] = {bank.name: bank for bank in community}
+    for bank in learned:
+        by_name[bank.name] = bank
+    all_banks = tuple(by_name.values())
+
     by_sender: dict[str, BankPatterns] = {}
     for bank in all_banks:
         for sender in bank.email_senders:
             by_sender[sender.casefold()] = bank
     content = store_version + '|' + ','.join(b.name for b in all_banks)
     version = hashlib.sha256(content.encode()).hexdigest()[:12]
-    return RegistrySnapshot(banks=tuple(all_banks), by_sender=by_sender, version=version)
+    return RegistrySnapshot(banks=all_banks, by_sender=by_sender, version=version)
 
 
 class PatternRegistry:
@@ -143,6 +152,10 @@ class PatternRegistry:
 
     def snapshot(self) -> RegistrySnapshot:
         return self._snapshot
+
+    @property
+    def store(self) -> PatternStore | None:
+        return self._store
 
     def reload_if_changed(self) -> None:
         now = time.monotonic()

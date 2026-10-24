@@ -9,13 +9,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib.resources import files
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from forwarder.sanitizer.banks import BankPatterns, TransactionPattern
 
-
-if TYPE_CHECKING:
-    pass
 
 log = logging.getLogger(__name__)
 
@@ -92,18 +88,6 @@ class PatternStore:
             .fetchone()
         )
         return str(row[0]) if row else ''
-
-    def get_active_patterns(self, bank_slug: str) -> list[LearnedPatternRow]:
-        rows = (
-            self._conn()
-            .execute(
-                'SELECT * FROM learned_patterns'
-                " WHERE bank_slug = ? AND status IN ('active', 'candidate') ORDER BY id",
-                (bank_slug,),
-            )
-            .fetchall()
-        )
-        return [_row_to_pattern(r) for r in rows]
 
     def get_all_active_patterns(self) -> list[LearnedPatternRow]:
         rows = (

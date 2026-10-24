@@ -22,7 +22,7 @@ def test_loads_committed_config_without_imap_credentials(environment, monkeypatc
     monkeypatch.delenv('IMAP_HOST', raising=False)
     cfg = load(CONFIG)
     assert cfg.chat_id == 123456789
-    assert cfg.hermes_webhook_url == 'http://hermes:8443/telegram'
+    assert cfg.hermes_webhook_url == 'http://sms-listener:9001/inject'
     assert cfg.gateway_url == 'http://hermes:8080/gateway'
     assert cfg.port == 9000
     assert 'synthetic-secret' not in repr(cfg)
@@ -62,7 +62,7 @@ def test_invalid_identity_or_secret_fails_without_echoing_values(
         ('timeout_seconds', -1),
         ('gateway_url', 'file:///private'),
         ('gateway_url', 'http://user:sensitive-value@host/gateway'),
-        ('hermes_webhook_url', 'http://hermes:8443/wrong-path'),
+        ('hermes_webhook_url', 'http://sms-listener:9001/inject?leak=sensitive-value'),
         ('host', ''),
     ],
 )

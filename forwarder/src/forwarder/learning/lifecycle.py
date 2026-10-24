@@ -39,9 +39,8 @@ def apply_feedback(store: PatternStore, pattern_id: int, verdict: str) -> None:
     if row is None:
         log.warning('feedback: pattern %d not found', pattern_id)
         return
-    if row.source_is_community():  # type: ignore[attr-defined]
-        log.warning('feedback: cannot demote community pattern %d', pattern_id)
-        return
+    # Only learned patterns live in the store; community patterns ship in YAML and
+    # have no row here, so there is nothing to guard against demoting.
     if verdict == 'wrong':
         store.increment_corrections(pattern_id)
         # Re-open the fingerprint so the next match triggers learning again

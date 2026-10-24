@@ -76,6 +76,9 @@ def poll(cfg: config.Config, unmatched_handler: object) -> None:
     for e in emails:
         result = sanitize(e.body, channel='email', sender=e.from_)
         if result.status == SanitizeStatus.MATCHED and result.payload is not None:
+            if cfg.dry_run:
+                log.info('dry_run: would dispatch payload=%s', result.payload.to_json())
+                continue
             try:
                 hermes.dispatch(result.payload, cfg.hermes_gateway_url, cfg.hermes_gateway_secret)
             except Exception:
