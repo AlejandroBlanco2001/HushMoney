@@ -88,7 +88,7 @@ The session string is generated once by `dev.sh` on first run and stored in `.en
 
 ### Forwarder (`forwarder/`)
 
-Two channels in, one channel out. Stateless.
+Two channels in, one channel out.
 
 | Module | Responsibility |
 |---|---|
@@ -96,10 +96,19 @@ Two channels in, one channel out. Stateless.
 | `channels/telegram.py` | Receive Telegram webhook updates (user-forwarded SMS) |
 | `sanitizer/` | Strip OTPs, account numbers, PII; extract structured `CleanPayload` |
 | `hermes.py` | POST `CleanPayload` to `gateway_server.py` via HTTP |
+| `learning/` | Learned pattern store (SQLite) + file-based proposal inbox |
 | `config.py` | Load and validate configuration from environment variables |
 | `__main__.py` | Poll loop — `imap.py` → `sanitizer` → `hermes.py` |
 
-The forwarder holds no state, no database, no retry queue. If dispatch fails, the message is dropped — financial notifications are ephemeral by nature.
+**The transaction path is stateless and drop-on-failure.** No transaction is persisted in
+the forwarder; if dispatch fails, the message is dropped — financial notifications are
+ephemeral by nature, and dropping is preferred to redelivery (see
+[ADR-0006](adr/0006-drop-on-failure-no-retry-queue.md)).
+
+**The forwarder does, however, hold learning state** — a SQLite database of learned bank
+patterns and a `pattern-inbox/` directory of proposals (see
+[ADR-0008](adr/0008-forwarder-is-stateful.md)). This state is durable and must be included
+in any backup; it is about *learned knowledge*, not about buffering transactions.
 
 **Gateway payload schema (`CleanPayload`):**
 ```json
@@ -155,16 +164,15 @@ Hermes → Telegram: "I got a notification I couldn't parse.
                     Which bank sent it?"
 User: "Davivienda"
 
-Hermes: uses NVIDIA model to infer structure from the raw message
-        (this is the ONE place in the system where Hermes sees
-        pre-sanitization content — see security exception below)
+Hermes: uses NVIDIA model to infer structure from the REDACTED message
+        (amounts/accounts already show as [REDACTED]; the model sees
+        word order and delimiters, never real values — see privacy note below)
 
-Hermes → Telegram: "I think this is a debit purchase of $85,000
-                    at Éxito on 14/09/2026. Correct?"
-User: "yes" / "no, it's a transfer"
+Hermes → Telegram: "This looks like a debit purchase. To validate the
+                    pattern I need the amount and date — what were they?"
+User: supplies amount + date (and merchant if visible)
 
 Hermes: stores confirmed pattern in SQLite (layer ②)
-        discards the raw message immediately
         applies pattern — transaction is processed normally
 ```
 
@@ -202,17 +210,25 @@ Hermes: stores pattern in SQLite (layer ②)
         community repo (tests/fixtures/) if they want
 ```
 
-**Security exception — raw message access:**
+**Privacy note — learning sees redacted text only:**
 
-In reactive mode only, Hermes briefly accesses the raw pre-sanitization message to
-infer the pattern. This is the single documented exception to the privacy boundary rule.
-Constraints that must be enforced:
+Hermes never sees pre-sanitization content. Even in the learning path, the text forwarded
+to the `bank_learning` skill is **already redacted** — amounts, account numbers, and OTPs
+show as `[REDACTED]` before the message leaves the forwarder. The single documented
+exception to the privacy boundary is narrow: the learning path forwards the *redacted but
+otherwise unparsed* notification to the LLM so it can infer structure. See
+[ADR-0002](adr/0002-privacy-boundary-redact-before-hermes.md). Constraints enforced:
 
-- The raw content is passed to the NVIDIA model for structural inference only
-- It is never stored, never logged, never written to SQLite
-- The model call uses a system prompt that instructs it not to include values in its output — only structure (field positions, delimiters, formats)
-- Once the pattern is stored, all subsequent messages from that bank are sanitized before Hermes sees them
-- If the user declines to confirm the inferred transaction, the raw content is discarded and the transaction is dropped
+- The model receives redacted text and infers structure only (field positions,
+  delimiters, formats) — never real values.
+- Because amounts are redacted, the skill must ask the user to confirm the actual amount
+  and date before a pattern is validated; it cannot recover them from the message.
+- The redacted text is never written to SQLite; only the derived pattern and a
+  `fingerprint` (a hash, not the content) are stored.
+- Lines that could spoof the `[bank_learning]` envelope header are stripped before
+  forwarding.
+- Once the pattern is stored, all subsequent messages from that bank are parsed
+  deterministically and never reach the LLM.
 
 ### Config (`config/`)
 
