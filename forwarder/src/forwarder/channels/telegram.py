@@ -246,10 +246,6 @@ async def route_update(
             bank_slug=result.bank_slug,
             channel='sms',
             status=result.status,
-            update_id=message['update_id'],
-            message_id=message['message_id'],
-            date=message['date'],
-            chat_id=cfg.chat_id,
             client=client,
         )
     else:

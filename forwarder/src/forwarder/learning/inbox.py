@@ -216,7 +216,7 @@ class InboxWatcher:
         if fp:
             self._store.upsert_fingerprint_state(fp, 'learned')
         self._store.log_proposal(proposal_id, 'pattern', 'accepted', [])
-        self._registry.reload_if_changed.__func__(self._registry)  # type: ignore[attr-defined]
+        self._registry.force_reload()
 
         self._write_result(
             proposal_id,

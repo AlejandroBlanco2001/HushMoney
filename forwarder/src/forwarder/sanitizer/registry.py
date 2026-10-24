@@ -163,7 +163,19 @@ class PatternRegistry:
             if now - self._last_reload < REGISTRY_RELOAD_MIN_INTERVAL_S:
                 return
             self._last_reload = now
+        self._reload()
 
+    def force_reload(self) -> None:
+        """Reload the snapshot now, bypassing the min-interval throttle.
+
+        Used right after a pattern is accepted, where the caller needs the new
+        pattern visible immediately rather than on the next polled reload.
+        """
+        with self._lock:
+            self._last_reload = time.monotonic()
+        self._reload()
+
+    def _reload(self) -> None:
         if self._store is None:
             return
 

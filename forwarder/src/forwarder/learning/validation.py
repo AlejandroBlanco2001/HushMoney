@@ -137,11 +137,13 @@ def validate(
 
     from decimal import Decimal, InvalidOperation
 
+    from forwarder.sanitizer.parser import parse_amount
+
+    # Use the same parser the live pipeline uses, so a pattern that validates here
+    # cannot later parse to a different number in production.
     raw_amount = match.group('amount')
-    tsep, dsep = bank.thousands_separator, bank.decimal_separator
-    try:
-        amount_val = float(raw_amount.replace(tsep, '').replace(dsep, '.'))
-    except ValueError:
+    amount_val = parse_amount(raw_amount, bank)
+    if amount_val is None:
         rejections.append(Rejection('amount_mismatch', f'could not parse amount {raw_amount!r}'))
         return ValidationResult(ok=False, rejections=tuple(rejections))
 

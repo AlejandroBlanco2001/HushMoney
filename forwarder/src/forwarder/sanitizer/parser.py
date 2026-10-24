@@ -30,7 +30,13 @@ class ParseResult:
     template: TransactionPattern | None = None
 
 
-def _parse_amount(raw: str, bank: BankPatterns) -> float | None:
+def parse_amount(raw: str, bank: BankPatterns) -> float | None:
+    """Parse a captured amount string to a float, or None if unparseable.
+
+    Auto-detects separators from the string, falling back to the bank's declared
+    separators. Shared by the live parser and by learned-pattern validation so the
+    two never diverge on the same input.
+    """
     value = _auto_parse_amount(raw)
     if value is None:
         # Fall back to bank's declared separators.
@@ -97,7 +103,7 @@ def parse(text: str, channel: Channel, bank: BankPatterns) -> ParseResult:
             continue
 
         raw_amount = match['amount']
-        amount = _parse_amount(raw_amount, bank)
+        amount = parse_amount(raw_amount, bank)
         if amount is None:
             return ParseResult(status=ParseStatus.INVALID_AMOUNT, template=transaction)
 
