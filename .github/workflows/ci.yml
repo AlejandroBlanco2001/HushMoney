@@ -24,3 +24,29 @@ jobs:
 
       - name: Run tests
         run: uv run --project forwarder pytest -c forwarder/pyproject.toml forwarder/tests
+
+  evals:
+    name: Offline skill evals (Python 3.12)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Deterministic, no-API-key evals only. The LLM evals (run.py, judge.py)
+      # need NEBIUS_API_KEY and run in the manual Evals workflow instead.
+      - name: Run offline evals
+        run: |
+          find evals -mindepth 2 -maxdepth 2 -name "*.py" \
+            ! -path "*/lib/*" \
+            ! -path "*/model_selection/*" \
+            ! -name "run.py" \
+            ! -name "judge.py" \
+            | sort | while read -r script; do
+              echo "::group::$script"
+              python "$script"
+              echo "::endgroup::"
+            done
