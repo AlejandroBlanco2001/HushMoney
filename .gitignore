@@ -35,6 +35,10 @@ Thumbs.db
 *.log
 logs/
 
+# Skill eval run artifacts (evals/model_selection/*.json is tracked seed data)
+evals/categorizer/results.json
+evals/summaries/results.json
+
 # Cloudflare / Node (Email Worker)
 node_modules/
 .wrangler/
