@@ -19,8 +19,9 @@
     Prerequisites:
       - Docker Desktop running.
       - .env filled in:  Copy-Item .env.example .env ; notepad .env
-      - The external volumes used by docker-compose.yml must exist
-        (untyped_hermes-data, untyped_forwarder-data, untyped_pattern-inbox).
+      - The external docker-compose volumes (untyped_hermes-data,
+        untyped_forwarder-data, untyped_pattern-inbox) are created automatically
+        on first run if missing.
       - OpenShell mode additionally needs the `openshell` CLI on PATH; without it,
         use -NoOpenShell.
 #>
@@ -66,6 +67,19 @@ function Invoke-Compose {
         & docker compose @ComposeArgs
     } finally {
         Pop-Location
+    }
+}
+
+function Initialize-Volumes {
+    # docker-compose.yml declares these volumes as `external: true`, so compose
+    # never creates them and fails if they are missing. `docker volume create` is
+    # idempotent — it is a no-op when the volume already exists. (The bash launcher
+    # assumes a prior setup step created them; on a fresh Windows box we ensure it.)
+    foreach ($vol in @('untyped_hermes-data', 'untyped_forwarder-data', 'untyped_pattern-inbox')) {
+        docker volume create $vol | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Stop-WithError "Failed to create Docker volume '$vol'. Is Docker Desktop running?"
+        }
     }
 }
 
@@ -142,6 +156,7 @@ if ($Logs) {
 # ── Up ───────────────────────────────────────────────────────────────────────
 
 Import-DotEnv
+Initialize-Volumes
 
 # ── Telegram session ──────────────────────────────────────────────────────────
 
