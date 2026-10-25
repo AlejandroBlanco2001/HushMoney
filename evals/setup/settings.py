@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+"""
+setup eval: user_settings persistence, completion flags, email config, accounts.
+
+No API key required — fully offline.
+
+Covers what would silently break onboarding or leak a secret:
+  - save_setting upserts (insert then update, one row)
+  - mark_setup_complete sets the completion flags
+  - save_email_config persists config but NEVER stores the IMAP password
+  - save_accounts is idempotent and links a card
+
+Usage:
+    python evals/setup/settings.py
+    python evals/setup/settings.py -v
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sqlite3
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from lib import db as _db, models as _models
+
+REPO_ROOT = _models.REPO_ROOT
+SCRIPTS = REPO_ROOT / "skills/setup/scripts"
+
+_TOTAL = 0
+_FAILURES: list[str] = []
+
+
+def check(name: str, cond: bool, detail: str = "") -> None:
+    global _TOTAL
+    _TOTAL += 1
+    print(f"  {'✓' if cond else '✗'} {name}" + ("" if cond else f"  — {detail}"))
+    if not cond:
+        _FAILURES.append(name)
+
+
+def run(script: str, *args: str, db_path: str, verbose: bool = False) -> dict:
+    env = {**os.environ, "HUSHMONEY_DB": db_path, "HUSHMONEY_SCHEMA": str(REPO_ROOT / "config/schema.sql")}
+    if verbose:
+        print(f"    $ {script} {' '.join(args)}")
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPTS / script), *args], capture_output=True, text=True, env=env
+    )
+    if proc.returncode != 0:
+        return {"_error": proc.stderr.strip()}
+    try:
+        out = json.loads(proc.stdout.strip())
+    except json.JSONDecodeError:
+        return {"_error": f"invalid JSON: {proc.stdout!r}"}
+    if verbose:
+        print(f"    → {out}")
+    return out
+
+
+def _settings(db_path: str) -> dict[str, str]:
+    con = sqlite3.connect(db_path)
+    rows = con.execute("SELECT key, value FROM user_settings").fetchall()
+    con.close()
+    return dict(rows)
+
+
+def main(verbose: bool = False) -> None:
+    with _db.temp_db() as db_path:
+        print("\nsetup eval\n")
+
+        run("save_setting.py", "locale", "es-CO", db_path=db_path, verbose=verbose)
+        run("save_setting.py", "locale", "en-US", db_path=db_path, verbose=verbose)
+        s = _settings(db_path)
+        con = sqlite3.connect(db_path)
+        n_locale = con.execute("SELECT COUNT(*) FROM user_settings WHERE key='locale'").fetchone()[0]
+        con.close()
+        check("save_setting_upsert_updates_value", s.get("locale") == "en-US", str(s.get("locale")))
+        check("save_setting_upsert_single_row", n_locale == 1, f"rows={n_locale}")
+
+        run("mark_setup_complete.py", db_path=db_path, verbose=verbose)
+        s = _settings(db_path)
+        check("setup_complete_flag", s.get("setup_complete") == "true", str(s.get("setup_complete")))
+        check("setup_step_done", s.get("setup_step") == "done", str(s.get("setup_step")))
+        check("setup_completed_at_set", bool(s.get("setup_completed_at")), str(s.get("setup_completed_at")))
+
+        run("save_email_config.py", "--provider", "gmail", "--host", "imap.gmail.com",
+            "--port", "993", "--username", "me@gmail.com",
+            "--bank-senders", "a@bank.com,b@bank.com", db_path=db_path, verbose=verbose)
+        s = _settings(db_path)
+        check("email_config_persisted", s.get("imap_host") == "imap.gmail.com"
+              and s.get("imap_username") == "me@gmail.com"
+              and s.get("bank_sender_emails") == "a@bank.com,b@bank.com", str(s))
+        check("email_config_advances_step", s.get("setup_step") == "sms", str(s.get("setup_step")))
+        # Security: the IMAP password must never be written to the DB.
+        pw_keys = [k for k in s if "password" in k.lower()]
+        check("imap_password_not_stored", pw_keys == [], f"found {pw_keys}")
+
+        a1 = run("save_accounts.py", "--bank", "bancolombia", "--type", "checking",
+                 "--currency", "COP", "--masked-number", "****1234",
+                 "--card-masked-number", "****5678", "--alias", "Debito",
+                 db_path=db_path, verbose=verbose)
+        check("account_created", a1.get("created") is True and a1.get("card_id"), str(a1))
+
+        a2 = run("save_accounts.py", "--bank", "bancolombia", "--type", "checking",
+                 "--currency", "COP", "--masked-number", "****1234",
+                 "--card-masked-number", "****5678", "--alias", "Debito",
+                 db_path=db_path, verbose=verbose)
+        check("account_idempotent", a2.get("created") is False and a2.get("account_id") == a1.get("account_id"), str(a2))
+
+        con = sqlite3.connect(db_path)
+        n_acc = con.execute("SELECT COUNT(*) FROM accounts").fetchone()[0]
+        n_card = con.execute("SELECT COUNT(*) FROM cards").fetchone()[0]
+        con.close()
+        check("no_duplicate_account_or_card", n_acc == 1 and n_card == 1, f"accounts={n_acc} cards={n_card}")
+
+        print(f"\n  {_TOTAL - len(_FAILURES)}/{_TOTAL} passed")
+        if _FAILURES:
+            sys.exit(1)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-v", "--verbose", action="store_true")
+    main(verbose=parser.parse_args().verbose)
