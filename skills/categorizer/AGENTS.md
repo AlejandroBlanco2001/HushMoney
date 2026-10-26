@@ -72,7 +72,7 @@ When the user replies, Hermes should:
 ## Schema
 
 ```sql
--- categories: canonical slug list, seeded from default_categories.json
+-- categories: canonical slug list, seeded with the defaults by config/schema.sql
 CREATE TABLE categories (
     slug TEXT PRIMARY KEY, label TEXT NOT NULL, description TEXT, created_at TEXT NOT NULL
 );

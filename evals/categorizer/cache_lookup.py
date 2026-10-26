@@ -37,8 +37,6 @@ SCRIPT = REPO_ROOT / "skills/categorizer/scripts/lookup_cached_category.py"
 # ── DB setup ───────────────────────────────────────────────────────────────────
 
 def _seed_db(db_path: str) -> None:
-    _db.seed_categories(db_path)
-
     con = sqlite3.connect(db_path)
     now = "2026-01-01T00:00:00+00:00"
 

@@ -114,7 +114,7 @@ CREATE INDEX IF NOT EXISTS idx_patterns_bank    ON learned_patterns(bank_slug, c
 CREATE INDEX IF NOT EXISTS idx_patterns_active  ON learned_patterns(active);
 
 -- ── Categories ─────────────────────────────────────────────────────────────────
--- Canonical spending category list. Seeded on first run from default_categories.json.
+-- Canonical spending category list. Seeded below with the defaults.
 -- Users can add/remove via Telegram: "hermes add category gambling".
 
 CREATE TABLE IF NOT EXISTS categories (
@@ -123,6 +123,23 @@ CREATE TABLE IF NOT EXISTS categories (
     description TEXT,
     created_at  TEXT NOT NULL
 );
+
+-- This file is re-applied on every boot, so seed only an empty table:
+-- a category the user removed must not come back after a restart.
+INSERT INTO categories (slug, label, description, created_at)
+SELECT column1, column2, column3, strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+FROM (VALUES
+    ('food',          'Food & Dining',        'Restaurants, cafes, supermarkets, food delivery'),
+    ('transport',     'Transport',            'Ride-hailing, taxis, fuel, parking, public transit'),
+    ('entertainment', 'Entertainment',        'Streaming, gaming, cinema, concerts, events'),
+    ('health',        'Health',               'Pharmacies, clinics, hospitals, gyms'),
+    ('shopping',      'Shopping',             'Clothing, electronics, online marketplaces'),
+    ('services',      'Services & Utilities', 'Telecom, utilities, insurance, rent'),
+    ('transfers',     'Transfers',            'Bank transfers, peer-to-peer payments'),
+    ('cash',          'Cash Withdrawal',      'ATM withdrawals'),
+    ('other',         'Other',                'Uncategorized or one-off expenses')
+)
+WHERE NOT EXISTS (SELECT 1 FROM categories);
 
 -- ── Merchants ──────────────────────────────────────────────────────────────────
 -- Merchant → category cache. Populated on first transaction from each merchant

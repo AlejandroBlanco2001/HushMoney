@@ -35,27 +35,3 @@ def temp_db(schema: Path | None = None) -> Iterator[str]:
         yield db_path
     finally:
         os.unlink(db_path)
-
-
-def seed_categories(db_path: str, categories: list[tuple[str, str]] | None = None) -> None:
-    """Insert the default category list into the categories table."""
-    now = "2026-01-01T00:00:00+00:00"
-    rows = categories or [
-        ("food",          "Food & Dining"),
-        ("transport",     "Transport"),
-        ("entertainment", "Entertainment"),
-        ("health",        "Health"),
-        ("shopping",      "Shopping"),
-        ("services",      "Services & Utilities"),
-        ("transfers",     "Transfers"),
-        ("cash",          "Cash Withdrawal"),
-        ("other",         "Other"),
-    ]
-    con = sqlite3.connect(db_path)
-    with con:
-        for slug, label in rows:
-            con.execute(
-                "INSERT OR IGNORE INTO categories (slug, label, created_at) VALUES (?, ?, ?)",
-                (slug, label, now),
-            )
-    con.close()
