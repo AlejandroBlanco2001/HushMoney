@@ -1,0 +1,11 @@
+{
+  "food":          {"label": "Comida",          "emoji": "🍔"},
+  "transport":     {"label": "Transporte",      "emoji": "🚌"},
+  "entertainment": {"label": "Entretenimiento", "emoji": "🎬"},
+  "health":        {"label": "Salud",           "emoji": "💊"},
+  "shopping":      {"label": "Compras",         "emoji": "🛍️"},
+  "services":      {"label": "Servicios",       "emoji": "💡"},
+  "transfers":     {"label": "Transferencias",  "emoji": "🔁"},
+  "cash":          {"label": "Efectivo",        "emoji": "💵"},
+  "other":         {"label": "Otros",           "emoji": "📦"}
+}
