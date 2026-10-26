@@ -65,7 +65,8 @@ hushmoney/
 │   ├── expense_tracker/
 │   ├── categorizer/
 │   ├── debt_tracker/
-│   └── summaries/
+│   ├── summaries/
+│   └── export/                ← sends transactions as a CSV file on Telegram
 └── tests/
     └── fixtures/
         └── emails/bancolombia/ ← real email samples (.eml) used in tests
@@ -143,3 +144,14 @@ These must not be violated under any circumstances:
 - Skills development → `docs/rules/python.md` + `docs/rules/evals.md`
 - Hermes configuration → `config/` + `docs/architecture.md`
 - Onboarding a new team member → `docs/onboarding.md`
+
+## Telegram Intents → Skills
+
+| User says | Skill | Command |
+|---|---|---|
+| "hermes export", "exportar", "export this month" | `export` | `export_csv.py --period month` |
+| "hermes export this week", "exportar esta semana" | `export` | `export_csv.py --period week` |
+| "hermes export 2026-09", "exportar septiembre" | `export` | `export_csv.py --month 2026-09` |
+| "exporta del 1 al 15 de octubre" | `export` | `export_csv.py --from 2026-10-01 --to 2026-10-15` |
+
+The export skill replies with a caption and a `MEDIA:<path>` line; the Hermes gateway uploads that file to Telegram as a document.

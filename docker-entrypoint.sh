@@ -9,7 +9,7 @@ fi
 mkdir -p /root/.hermes
 
 # Install hushmoney skills into hermes skills directory (full copy including scripts)
-for skill in expense_tracker setup categorizer summaries debt_tracker bank_learning; do
+for skill in expense_tracker setup categorizer summaries debt_tracker bank_learning export; do
     mkdir -p "/root/.hermes/skills/hushmoney/$skill"
     cp -r "/opt/data/skills/$skill/." "/root/.hermes/skills/hushmoney/$skill/"
 done
@@ -44,6 +44,7 @@ Routing:
 - Message starts with [bank_learning] → call the skills tool NOW with 'hushmoney/bank_learning'. Do NOT query any database directly. Do NOT run sqlite3. Follow the skill procedure exactly: run get_bank_context.py, then ask the user to confirm the amount and date.
 - Spending questions → hushmoney/summaries skill
 - Debt/split questions → hushmoney/debt_tracker skill
+- 'export', 'exportar', or a request for transactions as a file/CSV → hushmoney/export skill
 - User says 'reset', 'reset setup', 'resetear', 'empezar de nuevo', or similar →
   run: python3 /root/.hermes/skills/hushmoney/setup/scripts/save_setting.py setup_complete false
   run: python3 /root/.hermes/skills/hushmoney/setup/scripts/save_setting.py setup_step start
