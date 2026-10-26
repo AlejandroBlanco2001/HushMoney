@@ -9,6 +9,8 @@ Covers what would silently break onboarding or leak a secret:
   - mark_setup_complete sets the completion flags
   - save_email_config persists config but NEVER stores the IMAP password
   - save_accounts is idempotent and links a card
+  - a brand-new DB gets the default categories on boot, so categorized
+    transactions pass the foreign key (and removed ones are not re-seeded)
 
 Usage:
     python evals/setup/settings.py
@@ -22,6 +24,7 @@ import os
 import sqlite3
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -116,9 +119,57 @@ def main(verbose: bool = False) -> None:
         con.close()
         check("no_duplicate_account_or_card", n_acc == 1 and n_card == 1, f"accounts={n_acc} cards={n_card}")
 
-        print(f"\n  {_TOTAL - len(_FAILURES)}/{_TOTAL} passed")
-        if _FAILURES:
-            sys.exit(1)
+    _check_fresh_db_categories(verbose)
+
+    print(f"\n  {_TOTAL - len(_FAILURES)}/{_TOTAL} passed")
+    if _FAILURES:
+        sys.exit(1)
+
+
+def _category_slugs(db_path: str) -> set[str]:
+    con = sqlite3.connect(db_path)
+    slugs = {row[0] for row in con.execute("SELECT slug FROM categories")}
+    con.close()
+    return slugs
+
+
+def _check_fresh_db_categories(verbose: bool) -> None:
+    # Starts from a DB file that does not exist yet, like a new container's first
+    # boot — temp_db() would hide a missing seed because it applies the schema itself.
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = str(Path(tmp) / "fresh.db")
+        run("seed_defaults.py", db_path=db_path, verbose=verbose)
+        slugs = _category_slugs(db_path)
+        check("fresh_db_has_default_categories", len(slugs) == 9 and "other" in slugs, str(sorted(slugs)))
+
+        con = sqlite3.connect(db_path)
+        con.execute("PRAGMA foreign_keys = ON")
+        try:
+            with con:
+                con.execute(
+                    "INSERT INTO accounts (id, bank, alias, type, currency, masked_number, created_at)"
+                    " VALUES ('acc', 'bancolombia', 'Ahorros', 'checking', 'COP', '****1234', 'now')"
+                )
+                con.execute(
+                    "INSERT INTO transactions (id, account_id, amount, currency, merchant, date,"
+                    " transaction_type, channel, category, created_at, updated_at)"
+                    " VALUES ('tx', 'acc', 1000, 'COP', 'RAPPI', '2026-10-01T00:00:00Z',"
+                    " 'debit', 'sms', 'food', 'now', 'now')"
+                )
+            stored = None
+        except sqlite3.IntegrityError as exc:
+            stored = str(exc)
+        con.execute("DELETE FROM categories WHERE slug = 'other'")
+        con.commit()
+        con.close()
+        check("categorized_tx_passes_foreign_key", stored is None, str(stored))
+
+        run("seed_defaults.py", db_path=db_path, verbose=verbose)
+        check("removed_category_not_reseeded_on_boot", "other" not in _category_slugs(db_path),
+              str(sorted(_category_slugs(db_path))))
+
+        demo = run(str(REPO_ROOT / "scripts/seed_demo.py"), db_path=str(Path(tmp) / "demo.db"), verbose=verbose)
+        check("seed_demo_works_on_fresh_db", demo.get("ok") is True, str(demo))
 
 
 if __name__ == "__main__":

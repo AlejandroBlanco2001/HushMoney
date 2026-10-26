@@ -206,8 +206,6 @@ def run_case(case: Case, db_path: str, verbose: bool) -> tuple[bool, str]:
 
 def main(verbose: bool = False) -> None:
     with _db.temp_db() as db_path:
-        _db.seed_categories(db_path)
-
         for case in CASES:
             if case.charges:
                 _insert_transactions(db_path, case.merchant, case.charges)
