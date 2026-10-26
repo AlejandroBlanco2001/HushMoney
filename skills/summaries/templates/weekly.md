@@ -1,2 +1,8 @@
-# Weekly summary message template
-# TODO
+📊 Resumen semanal — $range
+
+$spending
+$categories
+
+$income
+
+$biggest_change

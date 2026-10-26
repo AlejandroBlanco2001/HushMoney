@@ -1,2 +1,8 @@
-# Monthly summary message template
-# TODO
+📊 Resumen mensual — $range
+
+$spending
+$categories
+
+$income
+
+$biggest_change
