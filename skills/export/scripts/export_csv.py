@@ -29,8 +29,9 @@ FILE_PREFIX = 'hushmoney_'
 COLUMNS = ['date', 'merchant', 'amount', 'currency', 'category',
            'transaction_type', 'account', 'channel']
 INCOME_TYPES = {'transfer_in', 'credit'}
-# Spreadsheet apps evaluate cells starting with these as formulas.
-FORMULA_PREFIXES = ('=', '+', '-', '@', '\t', '\r')
+# Spreadsheet apps evaluate cells starting with these as formulas; some locales
+# also accept the full-width forms.
+FORMULA_PREFIXES = ('=', '+', '-', '@', '\t', '\r', '\n', '＝', '＋', '－', '＠')
 ISO = '%Y-%m-%dT%H:%M:%SZ'
 
 
@@ -93,15 +94,17 @@ def _signed_amount(amount: float, transaction_type: str) -> str:
 
 def to_csv_row(row: sqlite3.Row) -> list[str]:
     account = ' '.join(p for p in (row['acct_bank'].title(), row['acct_masked']) if p)
+    # The amount is built from a number here, never from message text, and must
+    # stay unprefixed so a negative amount is still a number the sheet can sum.
     return [
-        row['date'],
+        _safe_text(row['date']),
         _safe_text(row['merchant']),
         _signed_amount(row['amount'], row['transaction_type']),
-        row['currency'],
+        _safe_text(row['currency']),
         _safe_text(row['category']),
-        row['transaction_type'],
+        _safe_text(row['transaction_type']),
         _safe_text(account),
-        row['channel'],
+        _safe_text(row['channel']),
     ]
 
 
@@ -115,7 +118,9 @@ def remove_previous_exports(out_dir: Path) -> None:
 def write_csv(path: Path, rows: list[sqlite3.Row]) -> None:
     # utf-8-sig adds a BOM so Excel shows accents (Nómina, Café) correctly.
     with path.open('w', newline='', encoding='utf-8-sig') as f:
-        writer = csv.writer(f)
+        # Quote every cell: Excel with a ';' list separator (es-CO) splits unquoted
+        # cells, so "RAPPI;=1+1" would start a new cell that is a formula.
+        writer = csv.writer(f, quoting=csv.QUOTE_ALL)
         writer.writerow(COLUMNS)
         writer.writerows(to_csv_row(r) for r in rows)
 

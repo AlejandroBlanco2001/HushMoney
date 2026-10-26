@@ -9,7 +9,8 @@ Covers what the user would notice if it silently regressed:
   - spending is negative, income (transfer_in, credit) is positive
   - --month / --from-to include only rows in range (inclusive end day)
   - no internal ids, message hashes or card numbers leak into the file
-  - formula-looking merchant names are neutralised
+  - formula-looking merchant names are neutralised, and every cell is quoted so
+    a separator inside a value cannot start a new formula cell (OWASP CSV injection)
   - an empty period writes no file, and each run clears the previous export
 
 Usage:
@@ -66,6 +67,8 @@ def _seed(db_path: str) -> None:
         ("t3", None, 12500.5, "Café Nómina", "2026-09-30T23:30:00Z", "payment", "email", "services"),
         ("t4", None, 1000, "=HYPERLINK(\"x\")", "2026-09-20T10:00:00Z", "debit", "sms", "other"),
         ("t5", None, 200000, None, "2026-09-21T10:00:00Z", "transfer_out", "email", "transfers"),
+        ("t8", None, 1000, "RAPPI;=1+1;", "2026-09-22T10:00:00Z", "debit", "sms", "other"),
+        ("t9", None, 1000, "＝1+1", "2026-09-23T10:00:00Z", "debit", "sms", "other"),
         ("t6", None, 7000, "OCTOBER", "2026-10-01T00:00:00Z", "debit", "sms", "food"),
         ("t7", None, 9000, "AUGUST", "2026-08-31T23:59:59Z", "debit", "sms", "food"),
     ]
@@ -111,7 +114,7 @@ def main(verbose: bool = False) -> None:
         print("\nexport export_csv eval\n")
 
         sept = run("--month", "2026-09", db_path=db_path, out_dir=out_dir, verbose=verbose)
-        check("month_count", sept.get("count") == 5, str(sept))
+        check("month_count", sept.get("count") == 7, str(sept))
         check("month_file_name", (sept.get("path") or "").endswith("hushmoney_2026-09.csv"), str(sept.get("path")))
         raw, rows = read_csv(sept["path"]) if sept.get("path") else ("", [[]])
 
@@ -131,6 +134,16 @@ def main(verbose: bool = False) -> None:
         check("transfer_out_is_negative", transfer_out[2:3] == ["-200000"], str(transfer_out))
         formula = by_date.get("2026-09-20T10:00:00Z", [])
         check("formula_neutralised", formula[1:2] == ["'=HYPERLINK(\"x\")"], str(formula))
+        fullwidth = by_date.get("2026-09-23T10:00:00Z", [])
+        check("fullwidth_formula_neutralised", fullwidth[1:2] == ["'＝1+1"], str(fullwidth))
+        # A ';' inside a value must stay inside quotes, or Excel with a ';' list
+        # separator would start a new cell with "=1+1".
+        check("separator_kept_inside_quotes", '"RAPPI;=1+1;"' in raw, raw)
+        lines = raw.splitlines()
+        check("every_cell_quoted", all(
+            line.startswith('"') and line.endswith('"') and line.count('","') == len(COLUMNS) - 1
+            for line in lines
+        ), "\n".join(lines))
 
         check("no_ids_or_hashes", "hash-" not in raw and "acc-co" not in raw and "t1" not in raw)
         check("no_card_number", "5678" not in raw)
