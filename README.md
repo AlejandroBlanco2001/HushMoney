@@ -79,7 +79,8 @@ hushmoney/
 │   ├── categorizer/
 │   ├── debt_tracker/
 │   ├── summaries/
-│   └── bank_learning/
+│   ├── bank_learning/
+│   └── export/
 ├── config/                # Hermes config, OpenShell policy, prompts
 └── docs/                  # Architecture, rules, onboarding
 ```

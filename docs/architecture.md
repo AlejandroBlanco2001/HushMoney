@@ -132,6 +132,7 @@ in any backup; it is about *learned knowledge*, not about buffering transactions
 | `categorizer` | Classify transaction into a spending category |
 | `debt_tracker` | Manage list of people owed / owing |
 | `summaries` | Generate daily, weekly, monthly rollups on schedule or on demand |
+| `export` | Send the user's transactions for a period as a CSV attachment on Telegram |
 | `bank_learning` | Learn new bank notification formats from user-provided samples; fallback when sanitizer has no pattern match |
 
 All skills are loaded by Hermes at runtime from the `skills/` directory.
