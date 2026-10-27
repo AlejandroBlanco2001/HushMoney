@@ -37,6 +37,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="$REPO_ROOT/.env"
 REMOTE_DIR="/home/ec2-user/hushmoney"
 REPO_URL="https://github.com/AlejandroBlanco2001/Untyped.git"
+DOCKER_MIN_MAJOR=28
 
 # ── Colors ─────────────────────────────────────────────────────────────────────
 
@@ -63,6 +64,11 @@ env_var() {
 
 ssh_ec2() {
     ssh -i "$EC2_KEY_FILE" -o StrictHostKeyChecking=no "$EC2_USER@$EC2_HOST" "$@"
+}
+
+docker_major() {
+    ssh_ec2 "sudo docker version --format '{{.Server.Version}}' 2>/dev/null || true" \
+        | cut -d. -f1
 }
 
 # ── Argument parsing ───────────────────────────────────────────────────────────
@@ -160,10 +166,32 @@ fi
 if [[ "$ROTATE_KEY" == false ]]; then
     info "Checking EC2 instance at $EC2_HOST..."
 
-    if ! ssh_ec2 "command -v docker &>/dev/null"; then
-        info "Installing Docker on EC2..."
-        ssh_ec2 "sudo dnf update -y && sudo dnf install -y docker git && sudo systemctl enable --now docker && sudo usermod -aG docker ec2-user"
-        warn "Docker installed. You may need to re-run this script once (group membership refreshes on new shell)."
+    if ssh_ec2 "command -v docker &>/dev/null"; then
+        ssh_ec2 "sudo systemctl enable --now docker >/dev/null 2>&1 || true"
+    fi
+
+    DOCKER_MAJOR="$(docker_major)"
+    if ! [[ "$DOCKER_MAJOR" =~ ^[0-9]+$ ]] || (( DOCKER_MAJOR < DOCKER_MIN_MAJOR )); then
+        if [[ -n "$DOCKER_MAJOR" ]]; then
+            warn "Docker $DOCKER_MAJOR on EC2 is below OpenShell's required ${DOCKER_MIN_MAJOR}.0; upgrading to Docker CE..."
+        else
+            info "Installing Docker CE on EC2 (OpenShell requires ${DOCKER_MIN_MAJOR}.0+)..."
+        fi
+        ssh_ec2 "rpm -q docker >/dev/null 2>&1 && sudo dnf remove -y docker || true"
+        ssh_ec2 "sudo dnf install -y dnf-plugins-core git"
+        ssh_ec2 "sudo dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo"
+        ssh_ec2 "sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
+        ssh_ec2 "sudo systemctl enable --now docker && sudo usermod -aG docker ec2-user"
+        warn "Docker CE installed. Existing images and volumes in /var/lib/docker are preserved."
+    fi
+
+    if ! ssh_ec2 "command -v git &>/dev/null"; then
+        ssh_ec2 "sudo dnf install -y git"
+    fi
+
+    DOCKER_MAJOR="$(docker_major)"
+    if ! [[ "$DOCKER_MAJOR" =~ ^[0-9]+$ ]] || (( DOCKER_MAJOR < DOCKER_MIN_MAJOR )); then
+        error "Docker Server ${DOCKER_MAJOR:-unknown} on EC2 is below ${DOCKER_MIN_MAJOR}.0; OpenShell sandbox creation will fail."
     fi
 
     if ! ssh_ec2 "docker compose version &>/dev/null 2>&1"; then
