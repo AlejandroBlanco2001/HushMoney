@@ -223,10 +223,6 @@ if [[ "$WITH_OPENSHELL" == true ]]; then
   then update EC2_HOST in .env and re-run setup.sh."
     fi
 
-    # openshell-gateway depends on podman; AL2023 has it in-repo but not preinstalled.
-    info "Installing podman on EC2 (required by openshell-gateway)..."
-    ssh_ec2 "command -v podman &>/dev/null || sudo dnf install -y podman"
-
     # AL2023 provides Docker but NOT podman (only containers-common libs), yet
     # OpenShell's Fedora RPM hard-requires podman. OpenShell runs fine on Docker
     # (gateway.toml pins compute_driver=docker), so patch the installer's one
