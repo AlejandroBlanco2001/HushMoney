@@ -267,16 +267,20 @@ HUSHMONEY_INBOX=/opt/data/pattern-inbox
 HUSHMONEY_REGISTRY=/opt/data/pattern-inbox/registry.json
 EOF
 
-    # Create the sandbox: build the self-contained image from the repo Dockerfile,
-    # apply the policy, upload the env. In v0.1.5 `--upload` is mutually exclusive
-    # with a trailing `-- command`, so we omit the command and rely on the image's
-    # ENTRYPOINT (/app/docker-entrypoint.sh). The entrypoint is a long-lived
-    # service, so run create detached and poll for readiness.
-    info "Creating the OpenShell sandbox (builds image, applies policy)..."
+    # Build the self-contained image with Docker (the gateway's engine). v0.1.5's
+    # `--from` no longer builds Dockerfiles — it takes a pre-built image reference.
+    info "Building the hermes image on EC2 (Docker)..."
+    ssh_ec2 "cd $REMOTE_DIR && docker build -t hushmoney-hermes ."
+
+    # Create the sandbox from the built image, apply the policy, upload the env.
+    # `--upload` is mutually exclusive with a trailing `-- command`, so we omit the
+    # command and rely on the image ENTRYPOINT (/app/docker-entrypoint.sh). It's a
+    # long-lived service, so run create detached and poll for readiness.
+    info "Creating the OpenShell sandbox (applies policy, uploads env)..."
     ssh_ec2 "openshell sandbox delete hushmoney-1 2>/dev/null || true"
     ssh_ec2 "cd $REMOTE_DIR && nohup openshell sandbox create \
         --name hushmoney-1 \
-        --from . \
+        --from hushmoney-hermes \
         --policy config/openshell/policy.yaml \
         --no-auto-providers \
         --upload /tmp/hermes-sandbox.env:/app/.env \
