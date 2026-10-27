@@ -59,3 +59,6 @@ env:
     valueFrom: { secret: TELEGRAM_CHAT_ID }
   - name: HERMES_GATEWAY_SECRET
     valueFrom: { secret: HERMES_GATEWAY_SECRET }
+  # Who may DM the bot. setup.sh sets this secret to the chat ID (normal) or "*" (--demo).
+  - name: TELEGRAM_ALLOWED_USERS
+    valueFrom: { secret: TELEGRAM_ALLOWED_USERS }

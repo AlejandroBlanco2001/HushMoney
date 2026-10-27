@@ -22,13 +22,14 @@
 #   ./scripts/setup.sh --rotate-key
 #
 # Deploy the public, judge-facing demo (fake data, no bank intake):
-#   ./scripts/setup.sh --demo
-#   - Starts only the hermes container (it runs its own Telegram gateway, so it
-#     receives /start directly — no forwarder or sms-listener needed)
+#   ./scripts/setup.sh --demo                   # plain docker compose (hermes only)
+#   ./scripts/setup.sh --demo --with-openshell  # hermes sandboxed in OpenShell (matches prod)
+#   - Runs hermes only (it runs its own Telegram gateway, so /start works without the
+#     forwarder/sms-listener); --with-openshell runs it inside the sandbox
 #   - Skips the IMAP/bank-email requirement
-#   - Opens TELEGRAM_ALLOWED_USERS so judges can message the bot. Set
-#     DEMO_ALLOWED_USERS in .env to scope access to specific chat IDs.
-#   - Seeds 3 months of fake transactions via seed_demo.sh
+#   - Opens TELEGRAM_ALLOWED_USERS=* so judges can message the bot. Set
+#     DEMO_ALLOWED_USERS in .env.demo to scope access to specific chat IDs.
+#   - Seeds 3 months of fake transactions (seed_demo.sh, or sandbox exec under OpenShell)
 
 set -euo pipefail
 
@@ -75,10 +76,6 @@ for arg in "$@"; do
         *) error "Unknown argument: $arg" ;;
     esac
 done
-
-if [[ "$DEMO" == true && "$WITH_OPENSHELL" == true ]]; then
-    error "--demo cannot be combined with --with-openshell (demo runs the standard path)."
-fi
 
 # Demo reads its own gitignored env file so it never clobbers your real .env.
 if [[ "$DEMO" == true ]]; then
@@ -238,6 +235,8 @@ if [[ "$WITH_OPENSHELL" == true ]]; then
     ssh_ec2 "openshell secret set TELEGRAM_BOT_TOKEN  '$TELEGRAM_BOT_TOKEN'"
     ssh_ec2 "openshell secret set TELEGRAM_CHAT_ID    '$TELEGRAM_CHAT_ID'"
     ssh_ec2 "openshell secret set HERMES_GATEWAY_SECRET '${HERMES_GATEWAY_SECRET:-}'"
+    # profile.yaml reads TELEGRAM_ALLOWED_USERS from this secret (demo: "*", normal: chat ID).
+    ssh_ec2 "openshell secret set TELEGRAM_ALLOWED_USERS '$ALLOWED_USERS'"
 
     info "Applying sandbox policy on EC2..."
     ssh_ec2 "cd $REMOTE_DIR && openshell policy set hushmoney --policy config/openshell/policy.yaml --wait"
@@ -255,8 +254,21 @@ if [[ "$WITH_OPENSHELL" == true ]]; then
     ssh_ec2 "openshell sandbox delete hushmoney-1 2>/dev/null || true"
     ssh_ec2 "openshell sandbox create --from hushmoney --name hushmoney-1"
 
-    info "Starting forwarder on EC2..."
-    ssh_ec2 "cd $REMOTE_DIR && docker compose up -d forwarder"
+    if [[ "$DEMO" == false ]]; then
+        info "Starting forwarder on EC2..."
+        ssh_ec2 "cd $REMOTE_DIR && docker compose up -d forwarder"
+    else
+        info "Seeding demo data into the sandbox..."
+        # hermes runs inside the sandbox (no `hermes` container), so seed via `sandbox
+        # exec`. The image ships neither schema.sql nor the seed script, so upload both;
+        # seed_demo.py applies the schema itself and needs only stdlib sqlite3.
+        ssh_ec2 "
+            for i in \$(seq 1 24); do openshell sandbox exec -n hushmoney-1 -- true 2>/dev/null && break; sleep 5; done
+            openshell sandbox upload hushmoney-1 $REMOTE_DIR/scripts/seed_demo.py /tmp/seed_demo.py
+            openshell sandbox upload hushmoney-1 $REMOTE_DIR/config/schema.sql   /tmp/schema.sql
+            openshell sandbox exec -n hushmoney-1 -- sh -c 'HUSHMONEY_DB=/opt/data/hushmoney.db HUSHMONEY_SCHEMA=/tmp/schema.sql python3 /tmp/seed_demo.py'
+        " || warn "Demo seeding failed (sandbox may still be starting). Re-run the upload+exec block, or just let the setup wizard collect accounts live in Telegram."
+    fi
 else
     # ── Standard path (no OpenShell) ───────────────────────────────────────────
     info "Starting stack on EC2 (services: $SERVICES)..."
