@@ -32,6 +32,7 @@ filesystem_policy:
                              # committed pm-runtime Python under /root/.hermes/installs
   read_write:
     - /root/.hermes          # Hermes state, SQLite, auth tokens
+    - /root/.local/state     # gateway token locks + runtime state (writable; parent is read_only)
     - /opt/data              # Hermes persistent volume (skills writes, db)
     - /tmp
     - /app                   # gateway_server.py lives here
