@@ -227,14 +227,17 @@ if [[ "$WITH_OPENSHELL" == true ]]; then
     info "Installing podman on EC2 (required by openshell-gateway)..."
     ssh_ec2 "command -v podman &>/dev/null || sudo dnf install -y podman"
 
-    # openshell-gateway's RPM hard-requires the podman package (AL2023 ships it
-    # in-repo but not preinstalled). We install it to satisfy packaging only —
-    # gateway.toml pins compute_driver=docker, so OpenShell runs on Docker.
-    info "Installing podman on EC2 (RPM dependency for openshell-gateway)..."
-    ssh_ec2 "command -v podman &>/dev/null || sudo dnf install -y podman"
-
-    info "Installing OpenShell on EC2..."
-    ssh_ec2 "command -v openshell &>/dev/null || curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh"
+    # AL2023 provides Docker but NOT podman (only containers-common libs), yet
+    # OpenShell's Fedora RPM hard-requires podman. OpenShell runs fine on Docker
+    # (gateway.toml pins compute_driver=docker), so patch the installer's one
+    # package step (dnf install) to `rpm --nodeps`, skipping the unsatisfiable
+    # podman dependency. This is the only `dnf install` in the installer.
+    info "Installing OpenShell on EC2 (Docker runtime; podman RPM dep bypassed)..."
+    ssh_ec2 'command -v openshell >/dev/null 2>&1 || {
+        curl -fsSL https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh -o /tmp/openshell-install.sh &&
+        sed -i "s/as_root dnf install -y /as_root rpm -Uvh --replacepkgs --nodeps /" /tmp/openshell-install.sh &&
+        sh /tmp/openshell-install.sh
+    }'
 
     info "Configuring OpenShell gateway on EC2..."
     ssh_ec2 "mkdir -p ~/.config/openshell && cp $REMOTE_DIR/config/openshell/gateway.toml ~/.config/openshell/gateway.toml"
