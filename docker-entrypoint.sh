@@ -56,7 +56,7 @@ cat > /root/.hermes/config.yaml << CONFEOF
 model:
   default: nvidia/nemotron-3-super-120b-a12b
   provider: openai
-  base_url: https://api.studio.nebius.ai/v1/
+  base_url: ${OPENAI_BASE_URL:-https://api.studio.nebius.ai/v1/}
 agent:
   reasoning_effort: low
   system_prompt: |

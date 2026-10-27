@@ -224,63 +224,86 @@ if [[ "$WITH_OPENSHELL" == true ]]; then
     fi
 
     # AL2023 provides Docker but NOT podman (only containers-common libs), yet
-    # OpenShell's Fedora RPM hard-requires podman. OpenShell runs fine on Docker
-    # (gateway.toml pins compute_driver=docker), so patch the installer's one
-    # package step (dnf install) to `rpm --nodeps`, skipping the unsatisfiable
-    # podman dependency. This is the only `dnf install` in the installer.
+    # OpenShell's Fedora RPM hard-requires podman. OpenShell runs fine on Docker,
+    # so patch the installer's one package step (dnf install) to `rpm --nodeps`,
+    # skipping the unsatisfiable podman dependency. The installer then auto-starts
+    # the gateway with the default (podman) config and fails — expected; we flip
+    # the driver to Docker next, so tolerate that non-zero exit.
     info "Installing OpenShell on EC2 (Docker runtime; podman RPM dep bypassed)..."
     ssh_ec2 'command -v openshell >/dev/null 2>&1 || {
         curl -fsSL https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh -o /tmp/openshell-install.sh &&
         sed -i "s/as_root dnf install -y /as_root rpm -Uvh --replacepkgs --nodeps /" /tmp/openshell-install.sh &&
-        sh /tmp/openshell-install.sh
+        { sh /tmp/openshell-install.sh || true; }
     }'
+    ssh_ec2 "command -v openshell >/dev/null 2>&1" || error "OpenShell CLI did not install on EC2."
 
-    info "Configuring OpenShell gateway on EC2..."
-    ssh_ec2 "mkdir -p ~/.config/openshell && cp $REMOTE_DIR/config/openshell/gateway.toml ~/.config/openshell/gateway.toml"
+    # The default gateway config pins compute_driver="podman" (absent on AL2023).
+    # Derive from the installed default and flip it to Docker, then (re)start.
+    info "Pointing the OpenShell gateway at Docker on EC2..."
+    ssh_ec2 'mkdir -p ~/.config/openshell &&
+        cp /usr/share/openshell-gateway/gateway.toml.default ~/.config/openshell/gateway.toml &&
+        sed -i "s/^compute_driver = \"podman\"/compute_driver = \"docker\"/" ~/.config/openshell/gateway.toml &&
+        systemctl --user restart openshell-gateway'
+    info "Waiting for the gateway to become active..."
+    ssh_ec2 'for i in $(seq 1 30); do systemctl --user is-active --quiet openshell-gateway && exit 0; sleep 2; done;
+        echo "gateway did not become active:"; systemctl --user status openshell-gateway --no-pager | head -25; exit 1'
 
-    info "Registering Nebius provider on EC2..."
-    ssh_ec2 "openshell provider list 2>/dev/null | grep -q nebius || \
-        openshell provider create nebius \
-            --endpoint https://api.studio.nebius.ai/v1/ \
-            --api-key $NEBIUS_API_KEY"
+    # Inference provider: register Nebius as an OpenAI-compatible backend and route
+    # generation through it. The sandbox calls inference.local (per policy.yaml) and
+    # OpenShell injects the key — so the Nebius key never enters the container.
+    info "Registering Nebius inference provider on EC2..."
+    ssh_ec2 "openshell provider list 2>/dev/null | grep -qw nebius || \
+        openshell provider create --name nebius --type openai \
+            --credential API_KEY='$NEBIUS_API_KEY' \
+            --config base_url=https://api.studio.nebius.ai/v1/"
+    info "Routing inference to Nemotron via Nebius..."
+    ssh_ec2 "openshell inference set --provider nebius --model nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B --no-verify"
 
-    info "Syncing secrets into OpenShell on EC2..."
-    ssh_ec2 "openshell secret set TELEGRAM_BOT_TOKEN  '$TELEGRAM_BOT_TOKEN'"
-    ssh_ec2 "openshell secret set TELEGRAM_CHAT_ID    '$TELEGRAM_CHAT_ID'"
-    ssh_ec2 "openshell secret set HERMES_GATEWAY_SECRET '${HERMES_GATEWAY_SECRET:-}'"
-    # profile.yaml reads TELEGRAM_ALLOWED_USERS from this secret (demo: "*", normal: chat ID).
-    ssh_ec2 "openshell secret set TELEGRAM_ALLOWED_USERS '$ALLOWED_USERS'"
+    # Sandbox env — hermes sources /app/.env on start. Inference points at
+    # inference.local, so OPENAI_API_KEY is a placeholder (real key stays in OpenShell).
+    info "Preparing sandbox environment file..."
+    ssh_ec2 "cat > /tmp/hermes-sandbox.env" <<EOF
+OPENAI_BASE_URL=http://inference.local/v1
+OPENAI_API_KEY=managed-by-openshell
+TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN
+TELEGRAM_CHAT_ID=$TELEGRAM_CHAT_ID
+TELEGRAM_ALLOWED_USERS=$ALLOWED_USERS
+HERMES_GATEWAY_SECRET=${HERMES_GATEWAY_SECRET:-}
+HUSHMONEY_DB=/opt/data/hushmoney.db
+HUSHMONEY_INBOX=/opt/data/pattern-inbox
+HUSHMONEY_REGISTRY=/opt/data/pattern-inbox/registry.json
+EOF
 
-    info "Applying sandbox policy on EC2..."
-    ssh_ec2 "cd $REMOTE_DIR && openshell policy set hushmoney --policy config/openshell/policy.yaml --wait"
-
-    info "Registering sandbox profile on EC2..."
-    ssh_ec2 "cd $REMOTE_DIR && (openshell profile list 2>/dev/null | grep -q hushmoney \
-        && openshell profile update config/openshell/profile.yaml \
-        || openshell profile register config/openshell/profile.yaml)"
-
-    info "Building hermes image on EC2..."
-    ssh_ec2 "cd $REMOTE_DIR && docker build -t hushmoney-hermes ."
-
-    info "Recreating sandbox on EC2..."
-    ssh_ec2 "openshell sandbox stop  hushmoney-1 2>/dev/null || true"
+    # Create the sandbox: build the self-contained image from the repo Dockerfile,
+    # apply the policy, attach the provider, upload the env, run the entrypoint.
+    # The entrypoint is a long-lived service, so run create detached and poll.
+    info "Creating the OpenShell sandbox (builds image, applies policy)..."
     ssh_ec2 "openshell sandbox delete hushmoney-1 2>/dev/null || true"
-    ssh_ec2 "openshell sandbox create --from hushmoney --name hushmoney-1"
+    ssh_ec2 "cd $REMOTE_DIR && nohup openshell sandbox create \
+        --name hushmoney-1 \
+        --from . \
+        --policy config/openshell/policy.yaml \
+        --provider nebius \
+        --upload /tmp/hermes-sandbox.env:/app/.env \
+        --no-tty \
+        -- /app/docker-entrypoint.sh > /tmp/hushmoney-sandbox.log 2>&1 &"
+
+    info "Waiting for the sandbox to become reachable (image build can take a few minutes)..."
+    ssh_ec2 'for i in $(seq 1 90); do openshell sandbox exec -n hushmoney-1 -- true 2>/dev/null && exit 0; sleep 5; done;
+        echo "sandbox not reachable; recent build/run log:"; tail -40 /tmp/hushmoney-sandbox.log 2>/dev/null; exit 1'
 
     if [[ "$DEMO" == false ]]; then
         info "Starting forwarder on EC2..."
         ssh_ec2 "cd $REMOTE_DIR && docker compose up -d forwarder"
     else
         info "Seeding demo data into the sandbox..."
-        # hermes runs inside the sandbox (no `hermes` container), so seed via `sandbox
-        # exec`. The image ships neither schema.sql nor the seed script, so upload both;
-        # seed_demo.py applies the schema itself and needs only stdlib sqlite3.
+        # No `hermes` container under OpenShell — seed via `sandbox exec`. seed_demo.py
+        # is self-contained (stdlib sqlite3, applies its own schema).
         ssh_ec2 "
-            for i in \$(seq 1 24); do openshell sandbox exec -n hushmoney-1 -- true 2>/dev/null && break; sleep 5; done
             openshell sandbox upload hushmoney-1 $REMOTE_DIR/scripts/seed_demo.py /tmp/seed_demo.py
             openshell sandbox upload hushmoney-1 $REMOTE_DIR/config/schema.sql   /tmp/schema.sql
             openshell sandbox exec -n hushmoney-1 -- sh -c 'HUSHMONEY_DB=/opt/data/hushmoney.db HUSHMONEY_SCHEMA=/tmp/schema.sql python3 /tmp/seed_demo.py'
-        " || warn "Demo seeding failed (sandbox may still be starting). Re-run the upload+exec block, or just let the setup wizard collect accounts live in Telegram."
+        " || warn "Demo seeding failed. Re-run the upload+exec, or let the setup wizard collect accounts live in Telegram."
     fi
 else
     # ── Standard path (no OpenShell) ───────────────────────────────────────────

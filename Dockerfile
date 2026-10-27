@@ -28,6 +28,17 @@ RUN ln -sf /root/.local/bin/hermes /usr/local/bin/hermes
 # HTTP gateway server deps
 RUN python3 -m pip install --no-cache-dir --break-system-packages starlette uvicorn
 
+# Bundle skills + config INTO the image. Under docker-compose these are
+# bind-mounted (and those mounts still override at runtime), but OpenShell
+# sandboxes have no bind mounts — so the image must be self-contained.
+COPY skills /opt/data/skills
+COPY config/hermes.yaml /opt/data/hermes.yaml
+COPY config/hermes.yaml /app/hermes.yaml
+COPY config/schema.sql /app/config/schema.sql
+COPY config/SOUL.md /app/SOUL.md
+COPY config/accounts.md /app/accounts.md
+RUN mkdir -p /opt/data/pattern-inbox
+
 COPY gateway_server.py /app/gateway_server.py
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
