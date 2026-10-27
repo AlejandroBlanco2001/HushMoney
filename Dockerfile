@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install hermes-agent (manages its own runtime deps)
-RUN curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
+RUN curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-computer-use --skip-browser
 
 ENV PATH="/root/.local/bin:$PATH"
 
