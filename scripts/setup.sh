@@ -319,9 +319,25 @@ EOF
     ssh_ec2 'for i in $(seq 1 90); do openshell sandbox exec -n hushmoney-1 -- true 2>/dev/null && exit 0; sleep 5; done;
         echo "sandbox not reachable; recent build/run log:"; tail -40 /tmp/hushmoney-sandbox.log 2>/dev/null; exit 1'
 
+    # Seed BEFORE launching hermes so its startup prompt reflects setup_complete=true
+    # — otherwise hermes boots into the onboarding wizard and would need a restart.
+    # No `hermes` container under OpenShell, so seed via `sandbox exec`; seed_demo.py
+    # is self-contained (stdlib sqlite3, applies its own schema) and sets
+    # setup_complete=true.
+    if [[ "$DEMO" == true ]]; then
+        info "Seeding demo data into the sandbox (also marks setup complete)..."
+        ssh_ec2 "
+            openshell sandbox exec -n hushmoney-1 -- sh -c 'mkdir -p /tmp/hushmoney-seed'
+            openshell sandbox upload hushmoney-1 $REMOTE_DIR/scripts/seed_demo.py /tmp/hushmoney-seed
+            openshell sandbox upload hushmoney-1 $REMOTE_DIR/config/schema.sql   /tmp/hushmoney-seed
+            openshell sandbox exec -n hushmoney-1 -- sh -c 'HUSHMONEY_DB=/opt/data/hushmoney.db HUSHMONEY_SCHEMA=/tmp/hushmoney-seed/schema.sql python3 /tmp/hushmoney-seed/seed_demo.py'
+        " || warn "Demo seeding failed. Re-run the upload+exec, or let the setup wizard collect accounts live in Telegram."
+    fi
+
     # sandbox create (with --upload) runs a shell, not the image ENTRYPOINT, so
     # start hermes explicitly (detached). The entrypoint sources /app/.env
-    # (HOME=/root) and launches hermes gateway + the HTTP gateway server.
+    # (HOME=/root) and launches hermes gateway + the HTTP gateway server. Run this
+    # AFTER seeding so the startup prompt is built with setup_complete=true.
     info "Starting hermes inside the sandbox..."
     ssh_ec2 "openshell sandbox exec -n hushmoney-1 -- sh -c 'cd /app && nohup /app/docker-entrypoint.sh > /tmp/hermes.log 2>&1 &'"
     sleep 4
@@ -329,16 +345,6 @@ EOF
     if [[ "$DEMO" == false ]]; then
         info "Starting forwarder on EC2..."
         ssh_ec2 "cd $REMOTE_DIR && docker compose up -d forwarder"
-    else
-        info "Seeding demo data into the sandbox..."
-        # No `hermes` container under OpenShell — seed via `sandbox exec`. seed_demo.py
-        # is self-contained (stdlib sqlite3, applies its own schema).
-        ssh_ec2 "
-            openshell sandbox exec -n hushmoney-1 -- sh -c 'rm -rf /tmp/seed_demo.py /tmp/schema.sql; mkdir -p /tmp/hushmoney-seed'
-            openshell sandbox upload hushmoney-1 $REMOTE_DIR/scripts/seed_demo.py /tmp/hushmoney-seed
-            openshell sandbox upload hushmoney-1 $REMOTE_DIR/config/schema.sql   /tmp/hushmoney-seed
-            openshell sandbox exec -n hushmoney-1 -- sh -c 'HUSHMONEY_DB=/opt/data/hushmoney.db HUSHMONEY_SCHEMA=/tmp/hushmoney-seed/schema.sql python3 /tmp/hushmoney-seed/seed_demo.py'
-        " || warn "Demo seeding failed. Re-run the upload+exec, or let the setup wizard collect accounts live in Telegram."
     fi
 else
     # ── Standard path (no OpenShell) ───────────────────────────────────────────
