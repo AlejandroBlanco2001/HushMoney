@@ -204,8 +204,10 @@ if [[ "$ROTATE_KEY" == false ]]; then
         info "Cloning repo to EC2..."
         ssh_ec2 "git clone $REPO_URL $REMOTE_DIR"
     else
-        info "Pulling latest code on EC2..."
-        ssh_ec2 "cd $REMOTE_DIR && git pull"
+        info "Updating code on EC2..."
+        # Hard-reset so a dirty working tree (e.g. a policy edited while debugging)
+        # never blocks the deploy.
+        ssh_ec2 "cd $REMOTE_DIR && git fetch -q origin && git reset --hard origin/main"
     fi
 fi
 
@@ -298,6 +300,9 @@ EOF
 
     # Build the self-contained image with Docker (the gateway's engine). v0.1.5's
     # `--from` no longer builds Dockerfiles — it takes a pre-built image reference.
+    # Reclaim space if the small root volume is nearly full — repeated builds pile
+    # up cache and the hermes image build needs a few GB.
+    ssh_ec2 'avail=$(df --output=avail -BG / 2>/dev/null | tail -1 | tr -dc 0-9); if [ "${avail:-99}" -lt 4 ]; then echo "Low disk (${avail}G free) — pruning Docker cache..."; docker builder prune -f >/dev/null 2>&1; docker image prune -f >/dev/null 2>&1; fi'
     info "Building the hermes image on EC2 (Docker)..."
     ssh_ec2 "cd $REMOTE_DIR && docker build -t hushmoney-hermes ."
 
@@ -340,7 +345,16 @@ EOF
     # AFTER seeding so the startup prompt is built with setup_complete=true.
     info "Starting hermes inside the sandbox..."
     ssh_ec2 "openshell sandbox exec -n hushmoney-1 -- sh -c 'cd /app && nohup /app/docker-entrypoint.sh > /tmp/hermes.log 2>&1 &'"
-    sleep 4
+
+    # Health check: wait for hermes to actually connect to Telegram (polling), so
+    # the deploy reports success/failure instead of leaving you guessing.
+    info "Waiting for hermes to connect to Telegram (up to ~2 min)..."
+    if ssh_ec2 'for i in $(seq 1 24); do openshell sandbox exec -n hushmoney-1 -- grep -q "Connected to Telegram" /tmp/hermes.log 2>/dev/null && exit 0; sleep 5; done; exit 1'; then
+        info "hermes connected to Telegram (polling mode). The bot is live."
+    else
+        warn "hermes did not report a Telegram connection within ~2 min. Inspect with:"
+        warn "  ssh -i $EC2_KEY_FILE $EC2_USER@$EC2_HOST \"openshell sandbox exec -n hushmoney-1 -- tail -40 /tmp/hermes.log\""
+    fi
 
     if [[ "$DEMO" == false ]]; then
         info "Starting forwarder on EC2..."
@@ -367,14 +381,24 @@ else
     info "Setup complete."
     echo ""
     echo "  EC2 instance:  $EC2_USER@$EC2_HOST"
-    echo "  Stack logs:    ssh -i $EC2_KEY_FILE $EC2_USER@$EC2_HOST 'cd $REMOTE_DIR && docker compose logs -f'"
-    echo "  Redeploy:      ssh -i $EC2_KEY_FILE $EC2_USER@$EC2_HOST 'cd $REMOTE_DIR && git pull && docker compose up -d --build'"
+    if [[ "$WITH_OPENSHELL" == true ]]; then
+        echo "  Sandbox:       ssh -i $EC2_KEY_FILE $EC2_USER@$EC2_HOST 'openshell sandbox list'"
+        echo "  Hermes log:    ssh -i $EC2_KEY_FILE $EC2_USER@$EC2_HOST 'openshell sandbox exec -n hushmoney-1 -- tail -n 50 /tmp/hermes.log'"
+        if [[ "$DEMO" == true ]]; then
+            echo "  Redeploy:      ./scripts/setup.sh --demo --with-openshell   (from your machine)"
+        else
+            echo "  Redeploy:      ./scripts/setup.sh --with-openshell   (from your machine)"
+        fi
+    else
+        echo "  Stack logs:    ssh -i $EC2_KEY_FILE $EC2_USER@$EC2_HOST 'cd $REMOTE_DIR && docker compose logs -f'"
+        echo "  Redeploy:      ssh -i $EC2_KEY_FILE $EC2_USER@$EC2_HOST 'cd $REMOTE_DIR && git pull && docker compose up -d --build'"
+    fi
     echo "  Local dev:     ./scripts/dev.sh"
     echo ""
     if [[ "$DEMO" == true ]]; then
         echo "  DEMO deployed:"
-        echo "    Bot:         open Telegram and send /start to ${BOT_USERNAME:-your demo bot}"
-        echo "    Data:        3 months of fake transactions seeded (seed_demo.sh is re-runnable)"
+        echo "    Bot:         open Telegram and message ${BOT_USERNAME:-your demo bot}"
+        echo "    Data:        3 months of fake transactions seeded; setup pre-completed"
         echo "    Access:      TELEGRAM_ALLOWED_USERS=${ALLOWED_USERS:-<empty = all>}"
         echo "    Keep alive:  leave this instance up through the judging period."
         echo ""
