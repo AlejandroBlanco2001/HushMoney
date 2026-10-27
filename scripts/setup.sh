@@ -214,8 +214,10 @@ if [[ "$WITH_OPENSHELL" == true ]]; then
     # ── OpenShell path ─────────────────────────────────────────────────────────
     # Requires kernel 6.2+ on EC2. Check first — AL2023 default ships 6.1.
     EC2_KERNEL="$(ssh_ec2 "uname -r")"
-    EC2_MAJOR_MINOR="$(echo "$EC2_KERNEL" | grep -oP '^\d+\.\d+')"
-    if ! awk "BEGIN{exit !($EC2_MAJOR_MINOR >= 6.2)}"; then
+    # Compare major/minor as integers — a float test wrongly ranks 6.18 below 6.2.
+    EC2_MAJOR=$((10#$(echo "$EC2_KERNEL" | cut -d. -f1)))
+    EC2_MINOR=$((10#$(echo "$EC2_KERNEL" | cut -d. -f2)))
+    if (( EC2_MAJOR < 6 || (EC2_MAJOR == 6 && EC2_MINOR < 2) )); then
         error "EC2 kernel $EC2_KERNEL is below 6.2 — OpenShell requires 6.2+.
   Update your AMI: launch a new AL2023 instance (kernel 6.6+) or switch to Ubuntu 24.04,
   then update EC2_HOST in .env and re-run setup.sh."
