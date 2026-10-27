@@ -28,6 +28,8 @@ filesystem_policy:
     - /opt/data/skills       # Hermes skills (bind-mounted ro by docker-compose)
     - /opt/data/hermes.yaml  # Hermes config (bind-mounted ro by docker-compose)
     - /root/.local           # hermes binary + runtimes — read_only grants EXECUTE
+    - /root/.hermes          # also in read_write; read_only here grants EXECUTE on the
+                             # committed pm-runtime Python under /root/.hermes/installs
   read_write:
     - /root/.hermes          # Hermes state, SQLite, auth tokens
     - /opt/data              # Hermes persistent volume (skills writes, db)
