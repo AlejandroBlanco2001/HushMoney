@@ -28,7 +28,7 @@ filesystem_policy:
     - /opt/data/skills       # Hermes skills (bind-mounted ro by docker-compose)
     - /opt/data/hermes.yaml  # Hermes config (bind-mounted ro by docker-compose)
   read_write:
-    - /root/.hermes          # Hermes state, SQLite, auth tokens
+    - /root                  # Hermes home: binary (/root/.local), state (/root/.hermes), self-update
     - /opt/data              # Hermes persistent volume (skills writes, db)
     - /tmp
     - /app                   # gateway_server.py lives here
