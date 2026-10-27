@@ -36,9 +36,11 @@ filesystem_policy:
 landlock:
   compatibility: best_effort
 
+# The image runs as root (hermes state lives in /root/.hermes), so run the
+# workload as root. OpenShell's Landlock/Seccomp/network policy still applies.
 process:
-  run_as_user: sandbox
-  run_as_group: sandbox
+  run_as_user: root
+  run_as_group: root
 
 network_policies:
   # ── Telegram Bot API ────────────────────────────────────────────────────
