@@ -56,7 +56,9 @@ require() {
 }
 
 env_var() {
-    grep -E "^$1=" "$ENV_FILE" | cut -d= -f2- | tr -d '"' | tr -d "'"
+    # `|| true` so a key that is absent (e.g. IMAP_* / TELEGRAM_API_* in .env.demo)
+    # does not make grep return non-zero and trip `set -o pipefail` + `set -e`.
+    { grep -E "^$1=" "$ENV_FILE" || true; } | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'"
 }
 
 ssh_ec2() {
