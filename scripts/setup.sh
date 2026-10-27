@@ -223,6 +223,16 @@ if [[ "$WITH_OPENSHELL" == true ]]; then
   then update EC2_HOST in .env and re-run setup.sh."
     fi
 
+    # openshell-gateway depends on podman; AL2023 has it in-repo but not preinstalled.
+    info "Installing podman on EC2 (required by openshell-gateway)..."
+    ssh_ec2 "command -v podman &>/dev/null || sudo dnf install -y podman"
+
+    # openshell-gateway's RPM hard-requires the podman package (AL2023 ships it
+    # in-repo but not preinstalled). We install it to satisfy packaging only —
+    # gateway.toml pins compute_driver=docker, so OpenShell runs on Docker.
+    info "Installing podman on EC2 (RPM dependency for openshell-gateway)..."
+    ssh_ec2 "command -v podman &>/dev/null || sudo dnf install -y podman"
+
     info "Installing OpenShell on EC2..."
     ssh_ec2 "command -v openshell &>/dev/null || curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh"
 

@@ -1,6 +1,9 @@
 [openshell]
 version = 2
 
-# compute_driver is intentionally unset — OpenShell auto-detects Podman on dev
-# machines and Docker on EC2. Override to "podman" or "docker" if it fails.
+# Force Docker as the runtime: the EC2 host runs Docker (not podman), and
+# openshell-gateway's RPM only pulls podman in as a package dependency — it is
+# not used at runtime. Auto-detection targets Docker on EC2; we pin it so the
+# presence of the podman package can't flip the choice.
 [openshell.gateway]
+compute_driver = "docker"
