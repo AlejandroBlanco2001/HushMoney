@@ -43,5 +43,13 @@ COPY gateway_server.py /app/gateway_server.py
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
+# OpenShell requires a non-root workload user named 'sandbox' (it rejects root).
+# Give it /root as its home so the hermes state the entrypoint writes
+# (/root/.hermes) and the hermes install (/root/.local) are owned and found by it,
+# then hand it the runtime dirs. Compose still runs as root and can write these.
+RUN groupadd -g 1000 sandbox \
+ && useradd -u 1000 -g 1000 -M -d /root -s /bin/bash sandbox \
+ && chown -R 1000:1000 /root /opt/data /app
+
 WORKDIR /app
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
