@@ -248,23 +248,16 @@ if [[ "$WITH_OPENSHELL" == true ]]; then
     ssh_ec2 'for i in $(seq 1 30); do systemctl --user is-active --quiet openshell-gateway && exit 0; sleep 2; done;
         echo "gateway did not become active:"; systemctl --user status openshell-gateway --no-pager | head -25; exit 1'
 
-    # Inference provider: register Nebius as an OpenAI-compatible backend and route
-    # generation through it. The sandbox calls inference.local (per policy.yaml) and
-    # OpenShell injects the key — so the Nebius key never enters the container.
-    info "Registering Nebius inference provider on EC2..."
-    ssh_ec2 "openshell provider list 2>/dev/null | grep -qw nebius || \
-        openshell provider create --name nebius --type openai \
-            --credential API_KEY='$NEBIUS_API_KEY' \
-            --config base_url=https://api.studio.nebius.ai/v1/"
-    info "Routing inference to Nemotron via Nebius..."
-    ssh_ec2 "openshell inference set --provider nebius --model nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B --no-verify"
-
-    # Sandbox env — hermes sources /app/.env on start. Inference points at
-    # inference.local, so OPENAI_API_KEY is a placeholder (real key stays in OpenShell).
+    # Inference: hermes calls Nebius directly from inside the sandbox (egress is
+    # allowed in policy.yaml). OpenShell's own inference.local routing needs a
+    # provider "profile" unavailable for the openai type on this build, so we skip
+    # it — the sandbox still enforces filesystem/syscall/network isolation.
+    #
+    # Sandbox env — hermes sources /app/.env on start.
     info "Preparing sandbox environment file..."
     ssh_ec2 "cat > /tmp/hermes-sandbox.env" <<EOF
-OPENAI_BASE_URL=http://inference.local/v1
-OPENAI_API_KEY=managed-by-openshell
+OPENAI_BASE_URL=https://api.studio.nebius.ai/v1/
+OPENAI_API_KEY=$NEBIUS_API_KEY
 TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN
 TELEGRAM_CHAT_ID=$TELEGRAM_CHAT_ID
 TELEGRAM_ALLOWED_USERS=$ALLOWED_USERS
@@ -283,7 +276,7 @@ EOF
         --name hushmoney-1 \
         --from . \
         --policy config/openshell/policy.yaml \
-        --provider nebius \
+        --no-auto-providers \
         --upload /tmp/hermes-sandbox.env:/app/.env \
         --no-tty \
         -- /app/docker-entrypoint.sh > /tmp/hushmoney-sandbox.log 2>&1 &"

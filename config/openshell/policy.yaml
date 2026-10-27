@@ -3,7 +3,7 @@
 # Enforcement layers:
 #   Filesystem  Landlock LSM — agent can only write to its data dir and /tmp
 #   Syscalls    Seccomp BPF  — blocks privilege escalation and dangerous calls
-#   Network     OPA proxy    — egress limited to inference.local and api.telegram.org
+#   Network     OPA proxy    — egress limited to Nebius inference + api.telegram.org
 #
 # Schema: NVIDIA/NemoClaw v0.1.0 reference blueprint.
 # Binary path: /usr/local/bin/hermes (symlinked from /root/.local/bin/hermes
@@ -78,5 +78,22 @@ network_policies:
         rules:
           - allow: { method: GET, path: "/bot*/**" }
           - allow: { method: POST, path: "/bot*/**" }
+    binaries:
+      - { path: /usr/local/bin/hermes }
+
+  # ── Nebius inference (direct) ─────────────────────────────────────────────
+  # hermes calls the Nebius OpenAI-compatible endpoint directly for Nemotron
+  # generation. (OpenShell's inference.local routing needs a provider profile
+  # unavailable on this build; the sandbox still isolates everything else.)
+  nebius:
+    name: nebius
+    endpoints:
+      - host: api.studio.nebius.ai
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: "*", path: "/**" }
     binaries:
       - { path: /usr/local/bin/hermes }
