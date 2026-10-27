@@ -268,8 +268,10 @@ HUSHMONEY_REGISTRY=/opt/data/pattern-inbox/registry.json
 EOF
 
     # Create the sandbox: build the self-contained image from the repo Dockerfile,
-    # apply the policy, attach the provider, upload the env, run the entrypoint.
-    # The entrypoint is a long-lived service, so run create detached and poll.
+    # apply the policy, upload the env. In v0.1.5 `--upload` is mutually exclusive
+    # with a trailing `-- command`, so we omit the command and rely on the image's
+    # ENTRYPOINT (/app/docker-entrypoint.sh). The entrypoint is a long-lived
+    # service, so run create detached and poll for readiness.
     info "Creating the OpenShell sandbox (builds image, applies policy)..."
     ssh_ec2 "openshell sandbox delete hushmoney-1 2>/dev/null || true"
     ssh_ec2 "cd $REMOTE_DIR && nohup openshell sandbox create \
@@ -278,8 +280,7 @@ EOF
         --policy config/openshell/policy.yaml \
         --no-auto-providers \
         --upload /tmp/hermes-sandbox.env:/app/.env \
-        --no-tty \
-        -- /app/docker-entrypoint.sh > /tmp/hushmoney-sandbox.log 2>&1 &"
+        --no-tty > /tmp/hushmoney-sandbox.log 2>&1 &"
 
     info "Waiting for the sandbox to become reachable (image build can take a few minutes)..."
     ssh_ec2 'for i in $(seq 1 90); do openshell sandbox exec -n hushmoney-1 -- true 2>/dev/null && exit 0; sleep 5; done;
