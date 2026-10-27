@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="330" viewBox="0 0 860 330" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+  <rect x="0" y="0" width="860" height="330" rx="14" fill="#0d1117"/>
+  <rect x="0.5" y="0.5" width="859" height="329" rx="14" fill="none" stroke="#30363d"/>
+
+  <!-- title bar -->
+  <rect x="0" y="0" width="860" height="44" rx="14" fill="#161b22"/>
+  <rect x="0" y="28" width="860" height="16" fill="#161b22"/>
+  <circle cx="26" cy="22" r="6" fill="#ff5f56"/>
+  <circle cx="48" cy="22" r="6" fill="#ffbd2e"/>
+  <circle cx="70" cy="22" r="6" fill="#27c93f"/>
+  <text x="430" y="27" text-anchor="middle" font-size="13" fill="#8b949e">Terminal — confirming Docker is ready</text>
+
+  <g font-size="15">
+    <!-- version check -->
+    <text x="24" y="92"><tspan fill="#7ee787">$ </tspan><tspan fill="#c9d1d9">docker compose version</tspan></text>
+    <text x="24" y="118" fill="#8b949e">Docker Compose version v2.29.2</text>
+
+    <!-- ps -->
+    <text x="24" y="160"><tspan fill="#7ee787">$ </tspan><tspan fill="#c9d1d9">docker compose ps</tspan></text>
+
+    <!-- table header -->
+    <text x="24"  y="190" fill="#6e7681">NAME</text>
+    <text x="240" y="190" fill="#6e7681">STATUS</text>
+    <text x="420" y="190" fill="#6e7681">PORTS</text>
+
+    <!-- rows -->
+    <text x="24"  y="218" fill="#c9d1d9">hermes</text>
+    <text x="240" y="218"><tspan fill="#7ee787">Up</tspan><tspan fill="#8b949e"> 2 minutes</tspan></text>
+    <text x="420" y="218" fill="#79c0ff">0.0.0.0:8081-&gt;8080/tcp</text>
+
+    <text x="24"  y="246" fill="#c9d1d9">forwarder</text>
+    <text x="240" y="246"><tspan fill="#7ee787">Up</tspan><tspan fill="#8b949e"> 2 minutes</tspan></text>
+
+    <text x="24"  y="274" fill="#c9d1d9">sms-listener</text>
+    <text x="240" y="274"><tspan fill="#7ee787">Up</tspan><tspan fill="#8b949e"> 2 minutes</tspan></text>
+
+    <text x="24" y="308"><tspan fill="#7ee787">$ </tspan><tspan fill="#c9d1d9">▊</tspan></text>
+  </g>
+</svg>

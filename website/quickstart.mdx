@@ -1,97 +1,243 @@
 ---
 title: Quickstart
-description: Run HushMoney anywhere Docker is available — your laptop, a VPS, or any cloud instance.
+description: Install HushMoney end to end on Linux or Windows — Docker, Telegram, SMS, email, and your first run.
 ---
 
-HushMoney runs as a Docker Compose stack. If Docker is installed, it runs. No cloud account required.
+HushMoney runs as a Docker Compose stack on your own machine. Follow the steps below in order. Each step works on both **Linux** and **Windows** — pick your OS tab where they differ.
 
-## Prerequisites
+## Step 0 — Set up Docker
 
-<AccordionGroup>
-  <Accordion title="Docker">
-    Install [Docker Desktop](https://docs.docker.com/get-docker/) (Mac/Windows) or Docker Engine (Linux). Docker Compose v2 is included.
-  </Accordion>
-  <Accordion title="Telegram bot">
-    1. Message [@BotFather](https://t.me/BotFather) on Telegram
-    2. Send `/newbot` and follow the prompts
-    3. Copy the bot token — it looks like `123456789:ABCdef...`
-    4. Get your personal chat ID by messaging [@userinfobot](https://t.me/userinfobot)
-  </Accordion>
-  <Accordion title="Nebius API key">
-    Sign up at [nebius.ai](https://nebius.ai), create a project, and generate an API key from the **Token Factory** section.
-  </Accordion>
-  <Accordion title="Email account with IMAP">
-    You need an email account that receives your bank notifications and supports IMAP with an app password. See [Bank Setup](/configuration/bank-setup) for compatible providers.
-  </Accordion>
-</AccordionGroup>
+HushMoney needs Docker with Compose v2.
 
-## Deploy
+<Tabs>
+  <Tab title="Linux">
+    Install Docker Engine from your distro or the [official install guide](https://docs.docker.com/engine/install/). Then add your user to the `docker` group so you don't need `sudo`:
+
+    ```bash
+    sudo usermod -aG docker $USER
+    newgrp docker
+    docker compose version   # confirm Compose v2 is present
+    ```
+  </Tab>
+  <Tab title="Windows">
+    Install [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/). It bundles Compose v2 and the WSL 2 backend.
+
+    1. Enable **WSL 2** when the installer prompts (reboot if asked).
+    2. Launch Docker Desktop and wait until the whale icon says **Running**.
+    3. Confirm in PowerShell:
+
+    ```powershell
+    docker compose version
+    ```
+  </Tab>
+</Tabs>
+
+<Frame caption="Docker ready — Compose v2 and the stack running">
+  <img src="/images/docker-running.svg" alt="docker compose version and ps output showing all containers up" />
+</Frame>
+
+## Step 1 — Set up the Telegram bot
+
+Every user runs their own bot — nothing is shared. Create one and grab its identifiers.
 
 <Steps>
-  <Step title="Clone the repo">
-    ```bash
-    git clone https://github.com/AlejandroBlanco2001/Untyped.git
-    cd Untyped
-    ```
-  </Step>
-  <Step title="Create your .env">
-    ```bash
-    cp .env.example .env
-    ```
-    Fill in the required values. See [Environment Variables](/configuration/environment-variables) for the full reference.
+  <Step title="Create the bot">
+    Message [@BotFather](https://t.me/BotFather), send `/newbot`, and follow the prompts. Copy the token it returns — it looks like `123456789:ABCdef...`.
 
-    The minimum required set to get started:
-    ```bash
-    NEBIUS_API_KEY=...
-    TELEGRAM_BOT_TOKEN=...
-    TELEGRAM_CHAT_ID=...
-    IMAP_HOST=imap.gmail.com
-    IMAP_USERNAME=you@gmail.com
-    IMAP_PASSWORD=your-app-password
-    BANK_SENDER_EMAILS=alerts@yourbank.com
-    HERMES_GATEWAY_SECRET=any-random-string
-    ```
+    <Frame caption="Creating a bot with @BotFather">
+      <img src="/images/botfather-newbot.png" alt="BotFather /newbot flow" />
+    </Frame>
   </Step>
-  <Step title="Start the stack">
-    ```bash
-    docker compose up -d
-    ```
-
-    This starts three containers:
-    - `hermes` — the AI agent
-    - `forwarder` — email poller and sanitizer
-    - `sms-listener` — Telegram SMS intake (optional, see [iPhone SMS](/configuration/iphone-sms))
-
-    All containers restart automatically on reboot (`restart: unless-stopped`).
+  <Step title="Get your chat ID">
+    Message [@userinfobot](https://t.me/userinfobot). It replies with your numeric **user ID** — this is your `TELEGRAM_CHAT_ID`. Only this account will be able to talk to the bot.
   </Step>
-  <Step title="Verify">
-    Open Telegram, find your bot by username, and send `/start`. Then send `/status` — Hermes should reply confirming it's running.
+  <Step title="Note the derived values">
+    You'll need these in Step 4:
+    - `TELEGRAM_BOT_TOKEN` — the full token from BotFather
+    - `TELEGRAM_CHAT_ID` — your user ID from @userinfobot
+    - `BOT_USERNAME` — your bot's `@handle` (include the `@`)
   </Step>
 </Steps>
 
-## Load demo data (optional)
+## Step 2 — Set up SMS & push capture (optional)
 
-To pre-populate the database with 3 months of realistic fake transactions:
+Some banks notify you by **SMS**, others only by **push notification** from their app. iPhone Shortcuts can forward both into Telegram, where the `sms-listener` container picks them up. Skip this step entirely if your bank only sends email.
+
+<Steps>
+  <Step title="Get Telegram API credentials">
+    The listener logs in as your Telegram **user account** (separate from the bot). Go to [my.telegram.org](https://my.telegram.org) → **API Development Tools**, create an app, and copy `api_id` and `api_hash` for Step 4 (`TELEGRAM_API_ID` / `TELEGRAM_API_HASH`).
+  </Step>
+  <Step title="Install the iPhone Shortcuts">
+    Install whichever matches how your bank notifies you (or both), then open the **Shortcuts → Automation** tab to enable each one:
+
+    - **SMS:** [Install the Hush SMS shortcut](https://www.icloud.com/shortcuts/b1ef48a85fa4497ca53e300d858018c3)
+    - **Push:** [Install the Hush Push shortcut](https://www.icloud.com/shortcuts/52bd3c30504d4cc38e686dc35e30852b)
+
+    Each forwards a matching message straight to your Telegram. On **Android**, reproduce the same flow with Tasker or MacroDroid. Full walkthrough: [iPhone SMS](/configuration/iphone-sms).
+
+    <Frame caption="SMS automation — forwards texts from your bank to Telegram">
+      <img src="/images/ios-shortcut-sms.jpeg" alt="iOS automation: when I receive a message where Sender is Bancolombia, send to Telegram" />
+    </Frame>
+    <Frame caption="Push automation — forwards bank-app notifications to Telegram">
+      <img src="/images/ios-shortcut-push.jpeg" alt="iOS automation: when I receive a notification from Nu or Rappi, send to Telegram" />
+    </Frame>
+
+    <Warning>
+      **You must add filters manually.** Without them, the automation forwards *every* SMS or *every* app notification to Telegram — not just transactions. In the Shortcut, set the **From** sender (SMS) or the **app(s)** (Push) to your bank(s) only. Apple does not let a Shortcut filter by message *content*, so some non-transaction messages from that sender may still slip through — the forwarder's sanitizer discards anything it doesn't recognize, but narrowing the trigger here keeps the noise down. Sadly, this tuning can only be done by hand. :(
+    </Warning>
+  </Step>
+  <Step title="Generate the session string">
+    The session string is created automatically on your first run in Step 5 — `dev.sh` / `dev.ps1` detects the empty `TELEGRAM_SESSION_STRING`, prompts for your phone number and a one-time code, and writes it back to `.env`. You never set it by hand.
+
+    <Warning>
+      The session string authenticates as your full Telegram account — treat it like a password. It lives only in your `.env` and the `hermes-data` volume.
+    </Warning>
+  </Step>
+</Steps>
+
+## Step 3 — Set up the email forwarder
+
+HushMoney polls your inbox over IMAP for bank notification emails. Full provider list and app-password steps: [Bank Setup](/configuration/bank-setup).
+
+<Steps>
+  <Step title="Enable bank email alerts">
+    In your bank app, turn on email notifications for purchases, transfers, and withdrawals.
+  </Step>
+  <Step title="Note the sender address">
+    Open one notification email and copy the exact **From** address (e.g. `alerts@bancolombia.com.co`) for `BANK_SENDER_EMAILS`.
+  </Step>
+  <Step title="Create an IMAP app password">
+    Use a provider that supports IMAP app passwords (Gmail recommended; Yahoo, iCloud, Fastmail, Zoho also work). Generate a 16-character app password — you'll put it in `IMAP_PASSWORD` in Step 4.
+
+    <Note>OAuth-only providers (Microsoft 365, Outlook.com, Hotmail) aren't supported. Forward those emails to a Gmail account instead.</Note>
+  </Step>
+</Steps>
+
+## Step 4 — Fill in environment variables
+
+Copy the template and open it in an editor.
+
+<Tabs>
+  <Tab title="Linux">
+    ```bash
+    git clone https://github.com/AlejandroBlanco2001/Untyped.git
+    cd Untyped
+    cp .env.example .env
+    ${EDITOR:-nano} .env
+    ```
+  </Tab>
+  <Tab title="Windows">
+    ```powershell
+    git clone https://github.com/AlejandroBlanco2001/Untyped.git
+    cd Untyped
+    Copy-Item .env.example .env
+    notepad .env
+    ```
+  </Tab>
+</Tabs>
+
+Minimum set to get running (full reference: [Environment Variables](/configuration/environment-variables)):
+
+```bash
+# Telegram (Step 1)
+TELEGRAM_BOT_TOKEN=123456789:ABCdef...
+TELEGRAM_CHAT_ID=your-user-id
+BOT_USERNAME=@your_bot
+
+# Inference
+NEBIUS_API_KEY=...
+
+# Email forwarder (Step 3)
+IMAP_HOST=imap.gmail.com
+IMAP_USERNAME=you@gmail.com
+IMAP_PASSWORD=your-16-char-app-password
+BANK_SENDER_EMAILS=alerts@yourbank.com
+
+# Gateway secret — generate a random string
+HERMES_GATEWAY_SECRET=...
+
+# SMS capture (Step 2 — only if used)
+TELEGRAM_API_ID=12345678
+TELEGRAM_API_HASH=abcdef1234567890abcdef1234567890
+```
+
+<Tip>
+  Generate `HERMES_GATEWAY_SECRET` with `openssl rand -hex 32` (Linux) or any random string. Leave `TELEGRAM_SESSION_STRING` empty — Step 5 fills it.
+</Tip>
+
+<Frame caption="Where each .env value comes from (example values are fake)">
+  <img src="/images/env-annotated.svg" alt="Annotated .env mapping each variable to its source" />
+</Frame>
+
+## Step 5 — Run the containers
+
+<Tabs>
+  <Tab title="Linux">
+    ```bash
+    ./scripts/dev.sh                # start (with OpenShell sandbox by default)
+    ./scripts/dev.sh --no-openshell # start without sandboxing
+    ```
+
+    Or plain Compose:
+
+    ```bash
+    HERMES_UID=$(id -u) HERMES_GID=$(id -g) docker compose up -d
+    ```
+  </Tab>
+  <Tab title="Windows">
+    ```powershell
+    .\scripts\dev.ps1               # start (with OpenShell sandbox by default)
+    .\scripts\dev.ps1 -NoOpenShell  # start without sandboxing (typical on Docker Desktop)
+    ```
+
+    Or plain Compose:
+
+    ```powershell
+    docker compose up -d
+    ```
+  </Tab>
+</Tabs>
+
+On first run, if you set up SMS (Step 2), you'll be prompted for your phone number and a Telegram code to generate the session string — this happens once.
+
+The stack starts three containers (`hermes`, `forwarder`, `sms-listener`) with `restart: unless-stopped`, so they survive crashes and reboots.
+
+**Verify:** open Telegram, find your bot, and send `/start`. On first contact the bot launches a **guided setup wizard** — it asks about your banks and accounts one question at a time and saves everything for you, so you don't have to hand-edit files for Step 6. Just answer in the chat. (Say `reset setup` anytime to start the wizard over.) Afterwards, send `/status` and Hermes should confirm it's running.
+
+<Frame caption="The bot greeting you and responding to /status">
+  <img src="/images/bot-status-reply.svg" alt="Telegram chat: /start launches the setup wizard, /status confirms HushMoney is running" />
+</Frame>
+
+## Step 6 — Set up your accounts (optional)
+
+Your account aliases let transactions map to friendly names from day one. There are two ways to do this:
+
+**Easiest — let the bot ask you.** The setup wizard from Step 5 already collects your banks and accounts in the Telegram chat. If you went through it, you're done — skip this step.
+
+**Manual — pre-load a file.** Prefer to fill everything in up front? Edit `config/accounts.md`:
+
+```md
+# bancolombia / checking
+alias: Debito Bancolombia
+currency: COP
+account_last4: 1234
+card_last4: 5678
+```
+
+Delete the `DELETE THIS LINE` marker at the top of the file once you've filled it in. It's mounted into the Hermes container and loaded on startup. Use `skip` or leave a value blank when you don't know it.
+
+Prefer fake data for a test drive instead? Seed three months of realistic transactions:
 
 ```bash
 ./scripts/seed_demo.sh
 ```
 
-Seeds salary credits, groceries, transport, subscriptions, and sample debts across three accounts. Useful for trying the bot before your bank notifications arrive.
-
-## Keep it running
-
-The stack manages its own uptime — containers restart automatically after crashes or reboots. To check status at any time:
+## Keeping it running
 
 ```bash
-docker compose ps
-docker compose logs -f
-```
-
-To update to the latest version:
-
-```bash
-git pull && docker compose up -d --build
+docker compose ps        # status
+docker compose logs -f   # live logs
+git pull && docker compose up -d --build   # update
 ```
 
 ## Troubleshooting
@@ -100,12 +246,15 @@ git pull && docker compose up -d --build
   <Accordion title="Forwarder not picking up emails">
     - `BANK_SENDER_EMAILS` must exactly match the sender address in your bank's emails
     - Confirm IMAP is enabled on your email account
-    - Run `docker compose logs forwarder` to see what's happening
+    - Run `docker compose logs forwarder`
   </Accordion>
   <Accordion title="Telegram: Chat not found">
-    The bot has never received a message from you. Open Telegram, find your bot by username, and send `/start` to open the chat.
+    The bot has never received a message from you. Find your bot in Telegram and send `/start` first.
   </Accordion>
   <Accordion title="Hermes container keeps restarting">
-    Check that `NEBIUS_API_KEY` and `HERMES_GATEWAY_SECRET` are set correctly in `.env`, then run `docker compose logs hermes`.
+    Check `NEBIUS_API_KEY` and `HERMES_GATEWAY_SECRET` in `.env`, then run `docker compose logs hermes`.
+  </Accordion>
+  <Accordion title="SMS not captured">
+    Confirm `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` are set and that your forwarding rule sends the raw SMS text to your Telegram Saved Messages. Check `docker logs -f sms-listener`.
   </Accordion>
 </AccordionGroup>

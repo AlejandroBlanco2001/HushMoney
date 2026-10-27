@@ -16,7 +16,6 @@ You do not need to know how to code. The AI assistant will write the code; your 
 
 1. Copy `.env.example` to `.env` and fill in your credentials:
    - `TELEGRAM_BOT_TOKEN` — from [@BotFather](https://t.me/BotFather)
-   - `TELEGRAM_BOT_ID` — the number before the `:` in your bot token
    - `TELEGRAM_CHAT_ID` — your personal Telegram user ID (ask [@userinfobot](https://t.me/userinfobot))
    - `BOT_USERNAME` — your bot's `@handle`
    - `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` — from [my.telegram.org](https://my.telegram.org)

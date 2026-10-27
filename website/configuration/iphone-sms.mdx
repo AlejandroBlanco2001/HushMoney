@@ -15,11 +15,12 @@ The Pyrogram listener (`sms-listener` container) is logged in as your Telegram u
 
 ## Step 1 — Install the Shortcut
 
-<Note>
-  A pre-built Shortcut link is available in `docs/telegram.md`. Open it on your iPhone to install in one tap.
-</Note>
+Install the pre-built shortcuts in one tap on your iPhone, then enable each from the **Shortcuts → Automation** tab:
 
-Or build it manually in the Shortcuts app:
+- **SMS:** [Install the Hush SMS shortcut](https://www.icloud.com/shortcuts/b1ef48a85fa4497ca53e300d858018c3)
+- **Push:** [Install the Hush Push shortcut](https://www.icloud.com/shortcuts/52bd3c30504d4cc38e686dc35e30852b) — for banks that only notify via app push, not SMS
+
+Or build the SMS one manually in the Shortcuts app:
 
 1. Open **Shortcuts** → **Automation** → **New Automation**
 2. Trigger: **Message received** → Filter: **From** → add your bank's number
@@ -29,6 +30,10 @@ Or build it manually in the Shortcuts app:
 4. Disable **Ask Before Running**
 
 Repeat for each bank number you want to capture.
+
+<Warning>
+  **Filters are manual — set them before enabling.** By default these automations forward *every* SMS (or *every* app notification, for the Push shortcut) to Telegram, not just transactions. Narrow the trigger to your bank's sender/app only. Apple does not allow filtering by message *content*, so some non-transaction messages from that sender can still get through — the forwarder's sanitizer drops anything it can't parse, but tightening the trigger here reduces the noise. There is no way to automate this tuning; it has to be done by hand.
+</Warning>
 
 ## Step 2 — Generate a Telegram session string
 

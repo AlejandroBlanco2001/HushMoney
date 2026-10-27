@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="560" viewBox="0 0 980 560" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+  <!-- backdrop -->
+  <rect x="0" y="0" width="980" height="560" rx="14" fill="#0d1117"/>
+  <rect x="0.5" y="0.5" width="979" height="559" rx="14" fill="none" stroke="#30363d"/>
+
+  <!-- title bar -->
+  <rect x="0" y="0" width="980" height="46" rx="14" fill="#161b22"/>
+  <rect x="0" y="30" width="980" height="16" fill="#161b22"/>
+  <circle cx="26" cy="23" r="6" fill="#ff5f56"/>
+  <circle cx="48" cy="23" r="6" fill="#ffbd2e"/>
+  <circle cx="70" cy="23" r="6" fill="#27c93f"/>
+  <text x="490" y="28" text-anchor="middle" font-size="14" fill="#8b949e">.env — where each value comes from</text>
+
+  <!-- column divider -->
+  <line x1="560" y1="70" x2="560" y2="532" stroke="#21262d" stroke-width="1"/>
+  <text x="28"  y="88" font-size="12" fill="#6e7681">YOUR .env</text>
+  <text x="588" y="88" font-size="12" fill="#6e7681">GET IT FROM</text>
+
+  <!-- rows: key (green) = value (blue)    ← annotation (grey), arrow (orange) -->
+  <g font-size="15">
+    <!-- TELEGRAM_BOT_TOKEN -->
+    <text x="28" y="124"><tspan fill="#7ee787">TELEGRAM_BOT_TOKEN</tspan><tspan fill="#c9d1d9">=</tspan><tspan fill="#79c0ff">123456789:ABCdefGhIjK…</tspan></text>
+    <text x="560" y="124" fill="#f0883e">←</text><text x="582" y="124" fill="#adbac7">@BotFather</text>
+
+    <!-- TELEGRAM_CHAT_ID -->
+    <text x="28" y="152"><tspan fill="#7ee787">TELEGRAM_CHAT_ID</tspan><tspan fill="#c9d1d9">=</tspan><tspan fill="#79c0ff">987654321</tspan></text>
+    <text x="560" y="152" fill="#f0883e">←</text><text x="582" y="152" fill="#adbac7">@userinfobot (your user ID)</text>
+
+    <!-- BOT_USERNAME -->
+    <text x="28" y="180"><tspan fill="#7ee787">BOT_USERNAME</tspan><tspan fill="#c9d1d9">=</tspan><tspan fill="#79c0ff">@my_money_bot</tspan></text>
+    <text x="560" y="180" fill="#f0883e">←</text><text x="582" y="180" fill="#adbac7">BotFather handle (keep the @)</text>
+
+    <!-- NEBIUS_API_KEY -->
+    <text x="28" y="222"><tspan fill="#7ee787">NEBIUS_API_KEY</tspan><tspan fill="#c9d1d9">=</tspan><tspan fill="#79c0ff">neb_••••••••••••••••</tspan></text>
+    <text x="560" y="222" fill="#f0883e">←</text><text x="582" y="222" fill="#adbac7">Nebius → Token Factory</text>
+
+    <!-- IMAP_HOST -->
+    <text x="28" y="264"><tspan fill="#7ee787">IMAP_HOST</tspan><tspan fill="#c9d1d9">=</tspan><tspan fill="#79c0ff">imap.gmail.com</tspan></text>
+    <text x="560" y="264" fill="#f0883e">←</text><text x="582" y="264" fill="#adbac7">provider preset (see Bank Setup)</text>
+
+    <!-- IMAP_USERNAME -->
+    <text x="28" y="292"><tspan fill="#7ee787">IMAP_USERNAME</tspan><tspan fill="#c9d1d9">=</tspan><tspan fill="#79c0ff">you@gmail.com</tspan></text>
+    <text x="560" y="292" fill="#f0883e">←</text><text x="582" y="292" fill="#adbac7">your inbox address</text>
+
+    <!-- IMAP_PASSWORD -->
+    <text x="28" y="320"><tspan fill="#7ee787">IMAP_PASSWORD</tspan><tspan fill="#c9d1d9">=</tspan><tspan fill="#79c0ff">abcd efgh ijkl mnop</tspan></text>
+    <text x="560" y="320" fill="#f0883e">←</text><text x="582" y="320" fill="#adbac7">16-char Gmail App Password</text>
+
+    <!-- BANK_SENDER_EMAILS -->
+    <text x="28" y="348"><tspan fill="#7ee787">BANK_SENDER_EMAILS</tspan><tspan fill="#c9d1d9">=</tspan><tspan fill="#79c0ff">alerts@bank.com</tspan></text>
+    <text x="560" y="348" fill="#f0883e">←</text><text x="582" y="348" fill="#adbac7">the "From" of your bank's email</text>
+
+    <!-- HERMES_GATEWAY_SECRET -->
+    <text x="28" y="390"><tspan fill="#7ee787">HERMES_GATEWAY_SECRET</tspan><tspan fill="#c9d1d9">=</tspan><tspan fill="#79c0ff">3f9a2c7b…</tspan></text>
+    <text x="560" y="390" fill="#f0883e">←</text><text x="582" y="390" fill="#adbac7">openssl rand -hex 32</text>
+
+    <!-- TELEGRAM_API_ID -->
+    <text x="28" y="432"><tspan fill="#7ee787">TELEGRAM_API_ID</tspan><tspan fill="#c9d1d9">=</tspan><tspan fill="#79c0ff">12345678</tspan></text>
+    <text x="560" y="432" fill="#f0883e">←</text><text x="582" y="432" fill="#adbac7">my.telegram.org (SMS only)</text>
+
+    <!-- TELEGRAM_API_HASH -->
+    <text x="28" y="460"><tspan fill="#7ee787">TELEGRAM_API_HASH</tspan><tspan fill="#c9d1d9">=</tspan><tspan fill="#79c0ff">abcdef1234567890…</tspan></text>
+    <text x="560" y="460" fill="#f0883e">←</text><text x="582" y="460" fill="#adbac7">my.telegram.org (SMS only)</text>
+  </g>
+
+  <!-- footer note -->
+  <text x="28" y="508" font-size="12.5" fill="#6e7681">All values above are fake examples. Leave TELEGRAM_SESSION_STRING empty — the first run fills it in.</text>
+</svg>
