@@ -326,9 +326,10 @@ EOF
         # No `hermes` container under OpenShell — seed via `sandbox exec`. seed_demo.py
         # is self-contained (stdlib sqlite3, applies its own schema).
         ssh_ec2 "
-            openshell sandbox upload hushmoney-1 $REMOTE_DIR/scripts/seed_demo.py /tmp/seed_demo.py
-            openshell sandbox upload hushmoney-1 $REMOTE_DIR/config/schema.sql   /tmp/schema.sql
-            openshell sandbox exec -n hushmoney-1 -- sh -c 'HUSHMONEY_DB=/opt/data/hushmoney.db HUSHMONEY_SCHEMA=/tmp/schema.sql python3 /tmp/seed_demo.py'
+            openshell sandbox exec -n hushmoney-1 -- sh -c 'rm -rf /tmp/seed_demo.py /tmp/schema.sql; mkdir -p /tmp/hushmoney-seed'
+            openshell sandbox upload hushmoney-1 $REMOTE_DIR/scripts/seed_demo.py /tmp/hushmoney-seed
+            openshell sandbox upload hushmoney-1 $REMOTE_DIR/config/schema.sql   /tmp/hushmoney-seed
+            openshell sandbox exec -n hushmoney-1 -- sh -c 'HUSHMONEY_DB=/opt/data/hushmoney.db HUSHMONEY_SCHEMA=/tmp/hushmoney-seed/schema.sql python3 /tmp/hushmoney-seed/seed_demo.py'
         " || warn "Demo seeding failed. Re-run the upload+exec, or let the setup wizard collect accounts live in Telegram."
     fi
 else
