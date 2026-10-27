@@ -30,6 +30,29 @@ RUN ln -sf /root/.local/bin/hermes /usr/local/bin/hermes
 # fail there — bake the committed env into the image instead.
 RUN hermes pm repair
 
+# Warm up the messaging-platform (telegram) deps at build time too: the gateway
+# installs `hermes-agent[telegram]` from PyPI on first run, which the sandbox
+# network policy blocks. Write the same platform config the entrypoint uses, then
+# run the gateway with a dummy token — it installs the deps into the committed env
+# and exits cleanly when the token is rejected.
+RUN printf '%s\n' \
+      'model:' \
+      '  default: nvidia/nemotron-3-super-120b-a12b' \
+      '  provider: openai' \
+      'platform_toolsets:' \
+      '  telegram:' \
+      '    - clarify' \
+      '    - cronjob' \
+      '    - file' \
+      '    - skills' \
+      '    - terminal' \
+      '    - todo' \
+      > /root/.hermes/config.yaml \
+ && { TELEGRAM_BOT_TOKEN=000000:dummy hermes gateway run > /tmp/gw-warmup.log 2>&1 || true; } \
+ && grep -q 'Installing Python dependencies' /tmp/gw-warmup.log \
+ && ! grep -q 'Installing Python dependencies failed' /tmp/gw-warmup.log \
+ && echo 'telegram deps committed'
+
 # HTTP gateway server deps
 RUN python3 -m pip install --no-cache-dir --break-system-packages starlette uvicorn
 

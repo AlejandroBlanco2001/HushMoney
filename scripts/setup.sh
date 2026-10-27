@@ -284,6 +284,7 @@ if [[ "$WITH_OPENSHELL" == true ]]; then
     # Sandbox env — hermes sources /app/.env on start.
     info "Preparing sandbox environment file..."
     ssh_ec2 "cat > /tmp/hermes-sandbox.env" <<EOF
+HOME=/root
 OPENAI_BASE_URL=https://api.studio.nebius.ai/v1/
 OPENAI_API_KEY=$NEBIUS_API_KEY
 TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN
@@ -301,9 +302,9 @@ EOF
     ssh_ec2 "cd $REMOTE_DIR && docker build -t hushmoney-hermes ."
 
     # Create the sandbox from the built image, apply the policy, upload the env.
-    # `--upload` is mutually exclusive with a trailing `-- command`, so we omit the
-    # command and rely on the image ENTRYPOINT (/app/docker-entrypoint.sh). It's a
-    # long-lived service, so run create detached and poll for readiness.
+    # `--upload` is mutually exclusive with a trailing `-- command`, so we create
+    # without a command (which starts a shell, not the ENTRYPOINT) and launch the
+    # entrypoint explicitly once the sandbox is reachable. Run create detached.
     info "Creating the OpenShell sandbox (applies policy, uploads env)..."
     ssh_ec2 "openshell sandbox delete hushmoney-1 2>/dev/null || true"
     ssh_ec2 "cd $REMOTE_DIR && nohup openshell sandbox create \
@@ -317,6 +318,13 @@ EOF
     info "Waiting for the sandbox to become reachable (image build can take a few minutes)..."
     ssh_ec2 'for i in $(seq 1 90); do openshell sandbox exec -n hushmoney-1 -- true 2>/dev/null && exit 0; sleep 5; done;
         echo "sandbox not reachable; recent build/run log:"; tail -40 /tmp/hushmoney-sandbox.log 2>/dev/null; exit 1'
+
+    # sandbox create (with --upload) runs a shell, not the image ENTRYPOINT, so
+    # start hermes explicitly (detached). The entrypoint sources /app/.env
+    # (HOME=/root) and launches hermes gateway + the HTTP gateway server.
+    info "Starting hermes inside the sandbox..."
+    ssh_ec2 "openshell sandbox exec -n hushmoney-1 -- sh -c 'cd /app && nohup /app/docker-entrypoint.sh > /tmp/hermes.log 2>&1 &'"
+    sleep 4
 
     if [[ "$DEMO" == false ]]; then
         info "Starting forwarder on EC2..."
