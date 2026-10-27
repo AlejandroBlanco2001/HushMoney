@@ -57,7 +57,11 @@ network_policies:
           - allow: { method: GET, path: "/bot*/**" }
           - allow: { method: POST, path: "/bot*/**" }
     binaries:
-      - { path: /usr/local/bin/hermes }
+      # hermes shells out to curl (via python3) for HTTP, so allow those too.
+      # Use the canonical hermes path — the kernel resolves the /usr/local symlink.
+      - { path: /root/.local/bin/hermes }
+      - { path: /usr/bin/curl }
+      - { path: /usr/bin/python3.11 }
 
   # ── Nebius inference (direct) ─────────────────────────────────────────────
   # hermes calls the Nebius OpenAI-compatible endpoint directly for Nemotron
@@ -73,4 +77,8 @@ network_policies:
         rules:
           - allow: { method: "*", path: "/**" }
     binaries:
-      - { path: /usr/local/bin/hermes }
+      # hermes shells out to curl (via python3) for HTTP, so allow those too.
+      # Use the canonical hermes path — the kernel resolves the /usr/local symlink.
+      - { path: /root/.local/bin/hermes }
+      - { path: /usr/bin/curl }
+      - { path: /usr/bin/python3.11 }
