@@ -179,7 +179,7 @@ if [[ "$ROTATE_KEY" == false ]]; then
         fi
         ssh_ec2 "rpm -q docker >/dev/null 2>&1 && sudo dnf remove -y docker || true"
         ssh_ec2 "sudo dnf install -y dnf-plugins-core git"
-        ssh_ec2 "sudo dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo"
+        ssh_ec2 "sudo dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo && sudo sed -i 's/[\$]releasever/9/g' /etc/yum.repos.d/docker-ce.repo"
         ssh_ec2 "sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
         ssh_ec2 "sudo systemctl enable --now docker && sudo usermod -aG docker ec2-user"
         warn "Docker CE installed. Existing images and volumes in /var/lib/docker are preserved."
