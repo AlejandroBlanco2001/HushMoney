@@ -25,6 +25,11 @@ ENV PATH="/root/.local/bin:$PATH"
 # (OpenShell binds network/filesystem policy rules to the binary path)
 RUN ln -sf /root/.local/bin/hermes /usr/local/bin/hermes
 
+# Commit the hermes runtime dependency environment at build time. Under OpenShell
+# the sandbox network policy blocks PyPI, so a first-run `hermes pm repair` would
+# fail there — bake the committed env into the image instead.
+RUN hermes pm repair
+
 # HTTP gateway server deps
 RUN python3 -m pip install --no-cache-dir --break-system-packages starlette uvicorn
 
