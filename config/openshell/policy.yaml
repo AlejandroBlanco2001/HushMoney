@@ -27,9 +27,9 @@ filesystem_policy:
     - /etc/group
     - /opt/data/skills       # Hermes skills (bind-mounted ro by docker-compose)
     - /opt/data/hermes.yaml  # Hermes config (bind-mounted ro by docker-compose)
+    - /root/.local           # hermes binary + runtimes — read_only grants EXECUTE
   read_write:
     - /root/.hermes          # Hermes state, SQLite, auth tokens
-    - /root/.local           # Hermes binary + runtimes — Landlock needs this to exec hermes
     - /opt/data              # Hermes persistent volume (skills writes, db)
     - /tmp
     - /app                   # gateway_server.py lives here
