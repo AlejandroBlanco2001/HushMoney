@@ -41,29 +41,6 @@ process:
   run_as_group: sandbox
 
 network_policies:
-  # ── OpenShell inference router ──────────────────────────────────────────
-  # Calls to inference.local inside the sandbox are intercepted and routed
-  # to Nebius by OpenShell. The Nebius API key never enters the container.
-  inference_local:
-    name: inference_local
-    endpoints:
-      - host: inference.local
-        port: 443
-        protocol: rest
-        enforcement: enforce
-        tls: terminate
-        rules:
-          - allow: { method: "*", path: "/**" }
-      - host: inference.local
-        port: 80
-        protocol: rest
-        enforcement: enforce
-        tls: terminate
-        rules:
-          - allow: { method: "*", path: "/**" }
-    binaries:
-      - { path: /usr/local/bin/hermes }
-
   # ── Telegram Bot API ────────────────────────────────────────────────────
   # hermes gateway run polls getUpdates and sends messages via sendMessage.
   # All other Telegram endpoints are blocked.
@@ -74,7 +51,6 @@ network_policies:
         port: 443
         protocol: rest
         enforcement: enforce
-        tls: terminate
         rules:
           - allow: { method: GET, path: "/bot*/**" }
           - allow: { method: POST, path: "/bot*/**" }
@@ -92,7 +68,6 @@ network_policies:
         port: 443
         protocol: rest
         enforcement: enforce
-        tls: terminate
         rules:
           - allow: { method: "*", path: "/**" }
     binaries:
