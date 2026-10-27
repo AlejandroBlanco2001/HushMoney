@@ -52,7 +52,6 @@ def check(name: str, cond: bool, detail: str = "") -> None:
 
 def _seed(db_path: str, rows: list[tuple]) -> None:
     """rows: (id, account, amount, currency, utc_date, type, category)."""
-    _db.seed_categories(db_path)
     con = sqlite3.connect(db_path)
     con.execute("INSERT INTO accounts (id, bank, type, currency, created_at)"
                 " VALUES ('acc-co', 'bancolombia', 'checking', 'COP', ?)", (CREATED,))
