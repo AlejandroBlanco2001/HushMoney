@@ -41,7 +41,7 @@ services:
       - OPENAI_BASE_URL=https://api.studio.nebius.ai/v1/
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
-      - TELEGRAM_ALLOWED_USERS=${TELEGRAM_CHAT_ID}
+      - TELEGRAM_ALLOWED_USERS=${TELEGRAM_ALLOWED_USERS:-${TELEGRAM_CHAT_ID}}
       - HERMES_GATEWAY_SECRET=${HERMES_GATEWAY_SECRET}
       - HUSHMONEY_DB=/opt/data/hushmoney.db
       - HUSHMONEY_INBOX=/opt/data/pattern-inbox

@@ -20,6 +20,15 @@
 #
 # Rotate Nebius API key (when someone's credits run out):
 #   ./scripts/setup.sh --rotate-key
+#
+# Deploy the public, judge-facing demo (fake data, no bank intake):
+#   ./scripts/setup.sh --demo
+#   - Starts only the hermes container (it runs its own Telegram gateway, so it
+#     receives /start directly — no forwarder or sms-listener needed)
+#   - Skips the IMAP/bank-email requirement
+#   - Opens TELEGRAM_ALLOWED_USERS so judges can message the bot. Set
+#     DEMO_ALLOWED_USERS in .env to scope access to specific chat IDs.
+#   - Seeds 3 months of fake transactions via seed_demo.sh
 
 set -euo pipefail
 
@@ -57,13 +66,24 @@ ssh_ec2() {
 
 ROTATE_KEY=false
 WITH_OPENSHELL=false
+DEMO=false
 for arg in "$@"; do
     case $arg in
         --rotate-key)     ROTATE_KEY=true ;;
         --with-openshell) WITH_OPENSHELL=true ;;
+        --demo)           DEMO=true ;;
         *) error "Unknown argument: $arg" ;;
     esac
 done
+
+if [[ "$DEMO" == true && "$WITH_OPENSHELL" == true ]]; then
+    error "--demo cannot be combined with --with-openshell (demo runs the standard path)."
+fi
+
+# Demo reads its own gitignored env file so it never clobbers your real .env.
+if [[ "$DEMO" == true ]]; then
+    ENV_FILE="$REPO_ROOT/.env.demo"
+fi
 
 # ── Step 1: Check tools ────────────────────────────────────────────────────────
 
@@ -75,7 +95,7 @@ info "All tools present."
 
 if [[ ! -f "$ENV_FILE" ]]; then
     cp "$REPO_ROOT/.env.example" "$ENV_FILE"
-    warn ".env created from .env.example — fill in your secrets, then re-run."
+    warn "$(basename "$ENV_FILE") created from .env.example — fill in your secrets, then re-run."
     exit 0
 fi
 
@@ -90,19 +110,51 @@ IMAP_HOST="$(env_var IMAP_HOST)"
 IMAP_USERNAME="$(env_var IMAP_USERNAME)"
 IMAP_PASSWORD="$(env_var IMAP_PASSWORD)"
 BANK_SENDER_EMAILS="$(env_var BANK_SENDER_EMAILS)"
+TELEGRAM_API_ID="$(env_var TELEGRAM_API_ID)"
+TELEGRAM_API_HASH="$(env_var TELEGRAM_API_HASH)"
+TELEGRAM_SESSION_STRING="$(env_var TELEGRAM_SESSION_STRING)"
+TELEGRAM_WEBHOOK_SECRET="$(env_var TELEGRAM_WEBHOOK_SECRET)"
+BOT_USERNAME="$(env_var BOT_USERNAME)"
+DEMO_ALLOWED_USERS="$(env_var DEMO_ALLOWED_USERS)"
 
 [[ -z "$NEBIUS_API_KEY"     || "$NEBIUS_API_KEY"     == *"your-"* ]] && error "NEBIUS_API_KEY not set in .env"
 [[ -z "$TELEGRAM_BOT_TOKEN" || "$TELEGRAM_BOT_TOKEN" == *"your-"* ]] && error "TELEGRAM_BOT_TOKEN not set in .env"
 [[ -z "$TELEGRAM_CHAT_ID"   || "$TELEGRAM_CHAT_ID"   == *"your-"* ]] && error "TELEGRAM_CHAT_ID not set in .env"
 [[ -z "$EC2_HOST"           || "$EC2_HOST"           == *"your-"* ]] && error "EC2_HOST not set in .env"
-[[ -z "$IMAP_HOST"          ]] && error "IMAP_HOST not set in .env"
-[[ -z "$IMAP_USERNAME"      ]] && error "IMAP_USERNAME not set in .env"
-[[ -z "$IMAP_PASSWORD"      ]] && error "IMAP_PASSWORD not set in .env"
-[[ -z "$BANK_SENDER_EMAILS" ]] && error "BANK_SENDER_EMAILS not set in .env"
+if [[ "$DEMO" == false ]]; then
+    [[ -z "$IMAP_HOST"          ]] && error "IMAP_HOST not set in .env"
+    [[ -z "$IMAP_USERNAME"      ]] && error "IMAP_USERNAME not set in .env"
+    [[ -z "$IMAP_PASSWORD"      ]] && error "IMAP_PASSWORD not set in .env"
+    [[ -z "$BANK_SENDER_EMAILS" ]] && error "BANK_SENDER_EMAILS not set in .env"
+fi
 [[ ! -f "$EC2_KEY_FILE"     ]] && error "EC2_KEY_FILE '$EC2_KEY_FILE' not found"
 
 EC2_USER="${EC2_USER:-ec2-user}"
 info ".env looks good."
+
+# ── Access list + services to run (demo vs normal) ───────────────────────────
+# Compose reads TELEGRAM_ALLOWED_USERS and falls back to TELEGRAM_CHAT_ID.
+if [[ "$DEMO" == true ]]; then
+    SERVICES="hermes"   # hermes runs its own Telegram gateway; no bank intake for the demo
+    if [[ -n "$DEMO_ALLOWED_USERS" ]]; then
+        ALLOWED_USERS="$DEMO_ALLOWED_USERS"
+    else
+        # Hermes treats an EMPTY allowlist as deny-all; "*" is the documented open-access
+        # wildcard (gateway/authz_mixin.py). Open it so judges can message without pre-sharing IDs.
+        ALLOWED_USERS="*"
+        warn "Demo mode: TELEGRAM_ALLOWED_USERS=* (open to ANY Telegram user) so judges can reach"
+        warn "the bot. This can invite spam / Nebius credit burn — set DEMO_ALLOWED_USERS in"
+        warn ".env.demo to scope it to specific chat IDs if you prefer."
+    fi
+else
+    ALLOWED_USERS="$TELEGRAM_CHAT_ID"
+    if [[ -n "$TELEGRAM_API_ID" && "$TELEGRAM_API_ID" != *"your-"* ]]; then
+        SERVICES="hermes forwarder sms-listener"
+    else
+        SERVICES="hermes forwarder"
+        warn "TELEGRAM_API_ID not set — skipping sms-listener (SMS capture disabled)."
+    fi
+fi
 
 # ── Step 3: Bootstrap EC2 (first run only) ────────────────────────────────────
 
@@ -137,6 +189,8 @@ ssh_ec2 "cat > $REMOTE_DIR/.env" <<EOF
 NEBIUS_API_KEY=$NEBIUS_API_KEY
 TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN
 TELEGRAM_CHAT_ID=$TELEGRAM_CHAT_ID
+TELEGRAM_ALLOWED_USERS=$ALLOWED_USERS
+BOT_USERNAME=$BOT_USERNAME
 HERMES_GATEWAY_SECRET=${HERMES_GATEWAY_SECRET:-}
 HERMES_GATEWAY_URL=http://hermes:8080/gateway
 HERMES_UID=1000
@@ -146,7 +200,16 @@ IMAP_USERNAME=$IMAP_USERNAME
 IMAP_PASSWORD=$IMAP_PASSWORD
 BANK_SENDER_EMAILS=$BANK_SENDER_EMAILS
 POLL_INTERVAL_SECONDS=${POLL_INTERVAL_SECONDS:-300}
+TELEGRAM_API_ID=$TELEGRAM_API_ID
+TELEGRAM_API_HASH=$TELEGRAM_API_HASH
+TELEGRAM_SESSION_STRING=$TELEGRAM_SESSION_STRING
+TELEGRAM_WEBHOOK_SECRET=${TELEGRAM_WEBHOOK_SECRET:-}
 EOF
+
+# docker-compose.yml declares its volumes as `external: true`, so compose never
+# creates them and fails if they are missing. `docker volume create` is idempotent.
+info "Ensuring external Docker volumes exist on EC2..."
+ssh_ec2 "for v in untyped_hermes-data untyped_forwarder-data untyped_pattern-inbox; do docker volume create \$v >/dev/null; done"
 
 if [[ "$WITH_OPENSHELL" == true ]]; then
     # ── OpenShell path ─────────────────────────────────────────────────────────
@@ -196,8 +259,14 @@ if [[ "$WITH_OPENSHELL" == true ]]; then
     ssh_ec2 "cd $REMOTE_DIR && docker compose up -d forwarder"
 else
     # ── Standard path (no OpenShell) ───────────────────────────────────────────
-    info "Starting stack on EC2..."
-    ssh_ec2 "cd $REMOTE_DIR && docker compose pull 2>/dev/null; docker compose up -d --build"
+    info "Starting stack on EC2 (services: $SERVICES)..."
+    ssh_ec2 "cd $REMOTE_DIR && docker compose pull $SERVICES 2>/dev/null; docker compose up -d --build $SERVICES"
+
+    if [[ "$DEMO" == true ]]; then
+        info "Waiting for hermes to come up, then seeding demo data..."
+        ssh_ec2 "sleep 15 && cd $REMOTE_DIR && ./scripts/seed_demo.sh" \
+            || warn "Seeding failed (hermes may still be starting). Re-run: ssh -i $EC2_KEY_FILE $EC2_USER@$EC2_HOST 'cd $REMOTE_DIR && ./scripts/seed_demo.sh'"
+    fi
 fi
 
 # ── Done ───────────────────────────────────────────────────────────────────────
@@ -213,4 +282,12 @@ else
     echo "  Redeploy:      ssh -i $EC2_KEY_FILE $EC2_USER@$EC2_HOST 'cd $REMOTE_DIR && git pull && docker compose up -d --build'"
     echo "  Local dev:     ./scripts/dev.sh"
     echo ""
+    if [[ "$DEMO" == true ]]; then
+        echo "  DEMO deployed:"
+        echo "    Bot:         open Telegram and send /start to ${BOT_USERNAME:-your demo bot}"
+        echo "    Data:        3 months of fake transactions seeded (seed_demo.sh is re-runnable)"
+        echo "    Access:      TELEGRAM_ALLOWED_USERS=${ALLOWED_USERS:-<empty = all>}"
+        echo "    Keep alive:  leave this instance up through the judging period."
+        echo ""
+    fi
 fi
