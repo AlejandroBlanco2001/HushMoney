@@ -2,6 +2,7 @@
 Upserts a single user_settings row.
 Usage: python3 save_setting.py <key> <value>
 """
+
 from __future__ import annotations
 
 import json

@@ -6,6 +6,7 @@ Guards two paths that were silently broken:
 - apply_feedback(verdict='wrong') must not raise (it called a non-existent
   LearnedPatternRow.source_is_community()).
 """
+
 from __future__ import annotations
 
 import pytest

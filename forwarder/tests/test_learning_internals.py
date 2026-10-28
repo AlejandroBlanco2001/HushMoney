@@ -1,4 +1,5 @@
 """Tests for Stage 3 internals: synthetic date generation and store rate limiting."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime

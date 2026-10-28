@@ -5,6 +5,7 @@ Safe to run multiple times — only inserts rows that don't already exist.
 Output JSON:
   { "setup_complete": "true"|"false", "setup_step": "<step>" }
 """
+
 from __future__ import annotations
 
 import json
@@ -17,13 +18,13 @@ DB_PATH = os.environ.get('HUSHMONEY_DB', os.path.expanduser('~/.hermes/hushmoney
 _SCHEMA_PATH = os.environ.get('HUSHMONEY_SCHEMA', '/app/config/schema.sql')
 
 DEFAULTS: dict[str, str] = {
-    'setup_complete':      'false',
-    'setup_step':          'start',
-    'email_provider':      '',
-    'imap_host':           '',
-    'imap_port':           '993',
-    'imap_username':       '',
-    'bank_sender_emails':  '',
+    'setup_complete': 'false',
+    'setup_step': 'start',
+    'email_provider': '',
+    'imap_host': '',
+    'imap_port': '993',
+    'imap_username': '',
+    'bank_sender_emails': '',
     'accounts_configured': 'false',
     'sms_channel_enabled': 'false',
 }
@@ -52,10 +53,14 @@ def main() -> None:
     settings = {row['key']: row['value'] for row in rows}
     con.close()
 
-    print(json.dumps({
-        'setup_complete': settings.get('setup_complete', 'false'),
-        'setup_step':     settings.get('setup_step', 'start'),
-    }))
+    print(
+        json.dumps(
+            {
+                'setup_complete': settings.get('setup_complete', 'false'),
+                'setup_step': settings.get('setup_step', 'start'),
+            }
+        )
+    )
 
 
 if __name__ == '__main__':

@@ -9,6 +9,7 @@ Usage:
 
 Output: {"ok": true}
 """
+
 from __future__ import annotations
 
 import argparse
@@ -18,19 +19,19 @@ import sqlite3
 from datetime import UTC, datetime
 
 
-DB_PATH = os.environ.get("HUSHMONEY_DB", os.path.expanduser("~/.hermes/hushmoney.db"))
+DB_PATH = os.environ.get('HUSHMONEY_DB', os.path.expanduser('~/.hermes/hushmoney.db'))
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--name", required=True, help="Merchant name (will be normalized)")
-    parser.add_argument("--category", default=None)
-    parser.add_argument("--needs-clarification", action="store_true")
-    parser.add_argument("--last-category", default=None, help="Most recent confirmed category")
-    parser.add_argument("--is-recurring", action="store_true")
+    parser.add_argument('--name', required=True, help='Merchant name (will be normalized)')
+    parser.add_argument('--category', default=None)
+    parser.add_argument('--needs-clarification', action='store_true')
+    parser.add_argument('--last-category', default=None, help='Most recent confirmed category')
+    parser.add_argument('--is-recurring', action='store_true')
     args = parser.parse_args()
 
-    name = " ".join(args.name.split()).upper()
+    name = ' '.join(args.name.split()).upper()
     now = datetime.now(UTC).isoformat()
 
     con = sqlite3.connect(DB_PATH)
@@ -46,12 +47,19 @@ def main() -> None:
                 is_recurring        = MAX(is_recurring, excluded.is_recurring),
                 updated_at          = excluded.updated_at
             """,
-            (name, args.category, int(args.needs_clarification), args.last_category,
-             int(args.is_recurring), now, now),
+            (
+                name,
+                args.category,
+                int(args.needs_clarification),
+                args.last_category,
+                int(args.is_recurring),
+                now,
+                now,
+            ),
         )
     con.close()
-    print(json.dumps({"ok": True}))
+    print(json.dumps({'ok': True}))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

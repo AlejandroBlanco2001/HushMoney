@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import replace
 from datetime import UTC
 from pathlib import Path
 
@@ -12,8 +11,7 @@ from forwarder import sanitizer
 from forwarder.imap import parse_email_bytes
 from forwarder.sanitizer import SanitizeStatus
 from forwarder.sanitizer.banks import BankPatterns, TransactionPattern
-from forwarder.sanitizer.registry import BANCOLOMBIA, PatternRegistry, RegistrySnapshot
-from forwarder.sanitizer.selector import BankSelector
+from forwarder.sanitizer.registry import BANCOLOMBIA, RegistrySnapshot
 
 
 TEXT = (

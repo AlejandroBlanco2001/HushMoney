@@ -1,4 +1,5 @@
 """Nebius API helpers: dotenv loading, SSL, HTTP call, JSON extraction."""
+
 from __future__ import annotations
 
 import json
@@ -15,14 +16,14 @@ from .models import API_BASE, REPO_ROOT
 
 def load_dotenv(path: Path | None = None) -> None:
     """Load .env into os.environ (skips keys already set)."""
-    path = path or (REPO_ROOT / ".env")
+    path = path or (REPO_ROOT / '.env')
     if not path.exists():
         return
     for line in path.read_text().splitlines():
         line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
+        if not line or line.startswith('#') or '=' not in line:
             continue
-        key, _, value = line.partition("=")
+        key, _, value = line.partition('=')
         key, value = key.strip(), value.strip().strip('"').strip("'")
         if key and key not in os.environ:
             os.environ[key] = value
@@ -31,10 +32,10 @@ def load_dotenv(path: Path | None = None) -> None:
 def ssl_context() -> ssl.SSLContext:
     ctx = ssl.create_default_context()
     for candidate in [
-        os.environ.get("NIX_SSL_CERT_FILE", ""),
-        os.environ.get("SSL_CERT_FILE", ""),
-        "/etc/ssl/certs/ca-certificates.crt",
-        "/etc/ssl/certs/ca-bundle.crt",
+        os.environ.get('NIX_SSL_CERT_FILE', ''),
+        os.environ.get('SSL_CERT_FILE', ''),
+        '/etc/ssl/certs/ca-certificates.crt',
+        '/etc/ssl/certs/ca-bundle.crt',
     ]:
         if candidate and Path(candidate).exists():
             ctx.load_verify_locations(cafile=candidate)
@@ -55,21 +56,23 @@ def chat_completion(
     Returns:
         {"content": str, "input_tokens": int, "output_tokens": int, "latency_ms": int}
     """
-    body = json.dumps({
-        "model": model_id,
-        "messages": messages,
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-    }).encode()
+    body = json.dumps(
+        {
+            'model': model_id,
+            'messages': messages,
+            'temperature': temperature,
+            'max_tokens': max_tokens,
+        }
+    ).encode()
 
     req = urllib.request.Request(
-        f"{API_BASE}/chat/completions",
+        f'{API_BASE}/chat/completions',
         data=body,
         headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {api_key}',
         },
-        method="POST",
+        method='POST',
     )
 
     t0 = time.perf_counter()
@@ -77,15 +80,15 @@ def chat_completion(
         latency_ms = round((time.perf_counter() - t0) * 1000)
         data = json.loads(resp.read())
 
-    message = data["choices"][0]["message"]
-    content = (message.get("content") or message.get("reasoning_content") or "").strip()
-    usage = data.get("usage", {})
+    message = data['choices'][0]['message']
+    content = (message.get('content') or message.get('reasoning_content') or '').strip()
+    usage = data.get('usage', {})
 
     return {
-        "content": content,
-        "input_tokens": usage.get("prompt_tokens", 0),
-        "output_tokens": usage.get("completion_tokens", 0),
-        "latency_ms": latency_ms,
+        'content': content,
+        'input_tokens': usage.get('prompt_tokens', 0),
+        'output_tokens': usage.get('completion_tokens', 0),
+        'latency_ms': latency_ms,
     }
 
 
@@ -106,7 +109,7 @@ def extract_json(text: str, valid_values: list[str] | None = None) -> dict[str, 
     # Works for both flat and nested JSON, and skips reasoning-model preamble.
     pos = len(text)
     while True:
-        pos = text.rfind("{", 0, pos)
+        pos = text.rfind('{', 0, pos)
         if pos == -1:
             break
         try:
@@ -117,7 +120,7 @@ def extract_json(text: str, valid_values: list[str] | None = None) -> dict[str, 
     # Last resort: scan for any known value
     if valid_values:
         for value in valid_values:
-            if re.search(rf"\b{re.escape(value)}\b", text, re.IGNORECASE):
-                return {"_scanned": value}
+            if re.search(rf'\b{re.escape(value)}\b', text, re.IGNORECASE):
+                return {'_scanned': value}
 
     return {}

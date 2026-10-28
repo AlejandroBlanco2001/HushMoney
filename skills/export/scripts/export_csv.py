@@ -12,6 +12,7 @@ Output: {"path": "/tmp/hushmoney_exports/hushmoney_2026-10.csv", "count": N,
          "period": "2026-10", "from": "...", "to": "..."}
 "path" is null when the period has no transactions (no file is written).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -26,8 +27,16 @@ from pathlib import Path
 DB_PATH = os.environ.get('HUSHMONEY_DB', os.path.expanduser('~/.hermes/hushmoney.db'))
 DEFAULT_OUT_DIR = '/tmp/hushmoney_exports'
 FILE_PREFIX = 'hushmoney_'
-COLUMNS = ['date', 'merchant', 'amount', 'currency', 'category',
-           'transaction_type', 'account', 'channel']
+COLUMNS = [
+    'date',
+    'merchant',
+    'amount',
+    'currency',
+    'category',
+    'transaction_type',
+    'account',
+    'channel',
+]
 INCOME_TYPES = {'transfer_in', 'credit'}
 # Spreadsheet apps evaluate cells starting with these as formulas; some locales
 # also accept the full-width forms.
@@ -40,7 +49,9 @@ def _start_of_day(dt: datetime) -> datetime:
 
 
 def _next_month(dt: datetime) -> datetime:
-    return dt.replace(year=dt.year + 1, month=1) if dt.month == 12 else dt.replace(month=dt.month + 1)
+    return (
+        dt.replace(year=dt.year + 1, month=1) if dt.month == 12 else dt.replace(month=dt.month + 1)
+    )
 
 
 def _parse_date(value: str) -> datetime:
@@ -65,7 +76,9 @@ def resolve_period(args: argparse.Namespace, now: datetime) -> tuple[datetime, d
     return start, now, start.strftime('%Y-%m')
 
 
-def fetch_transactions(con: sqlite3.Connection, start: datetime, end: datetime) -> list[sqlite3.Row]:
+def fetch_transactions(
+    con: sqlite3.Connection, start: datetime, end: datetime
+) -> list[sqlite3.Row]:
     con.row_factory = sqlite3.Row
     return con.execute(
         """
@@ -151,13 +164,17 @@ def main() -> None:
         path = out_dir / f'{FILE_PREFIX}{label}.csv'
         write_csv(path, rows)
 
-    print(json.dumps({
-        'path': str(path) if path else None,
-        'count': len(rows),
-        'period': label,
-        'from': start.strftime(ISO),
-        'to': end.strftime(ISO),
-    }))
+    print(
+        json.dumps(
+            {
+                'path': str(path) if path else None,
+                'count': len(rows),
+                'period': label,
+                'from': start.strftime(ISO),
+                'to': end.strftime(ISO),
+            }
+        )
+    )
 
 
 if __name__ == '__main__':

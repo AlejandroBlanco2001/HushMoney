@@ -14,6 +14,7 @@ Usage:
 Output:
   {"ok": true, "account_id": "<uuid>", "card_id": "<uuid>|null", "created": true|false}
 """
+
 from __future__ import annotations
 
 import argparse
@@ -39,13 +40,14 @@ def _ensure_schema(con: sqlite3.Connection) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument('--bank', required=True)
-    parser.add_argument('--type', required=True, dest='account_type',
-                        choices=list(VALID_TYPES))
+    parser.add_argument('--type', required=True, dest='account_type', choices=list(VALID_TYPES))
     parser.add_argument('--currency', required=True)
-    parser.add_argument('--masked-number', default=None,
-                        help='Last-4 digits of the account number (****1234)')
-    parser.add_argument('--card-masked-number', default=None,
-                        help='Last-4 digits of the linked card (****5678)')
+    parser.add_argument(
+        '--masked-number', default=None, help='Last-4 digits of the account number (****1234)'
+    )
+    parser.add_argument(
+        '--card-masked-number', default=None, help='Last-4 digits of the linked card (****5678)'
+    )
     parser.add_argument('--alias', default=None)
     args = parser.parse_args()
 
@@ -80,8 +82,15 @@ def main() -> None:
                 con.execute(
                     'INSERT INTO accounts (id, bank, alias, type, currency, masked_number, created_at)'
                     ' VALUES (?, ?, ?, ?, ?, ?, ?)',
-                    (account_id, bank, args.alias, args.account_type,
-                     args.currency, args.masked_number, now),
+                    (
+                        account_id,
+                        bank,
+                        args.alias,
+                        args.account_type,
+                        args.currency,
+                        args.masked_number,
+                        now,
+                    ),
                 )
             created = True
 
@@ -100,8 +109,7 @@ def main() -> None:
                     con.execute(
                         'INSERT INTO cards (id, account_id, type, masked_number, alias, created_at)'
                         ' VALUES (?, ?, ?, ?, ?, ?)',
-                        (card_id, account_id, card_type,
-                         args.card_masked_number, args.alias, now),
+                        (card_id, account_id, card_type, args.card_masked_number, args.alias, now),
                     )
             else:
                 card_id = str(card_row['id'])
@@ -109,8 +117,9 @@ def main() -> None:
     finally:
         con.close()
 
-    print(json.dumps({'ok': True, 'account_id': account_id,
-                      'card_id': card_id, 'created': created}))
+    print(
+        json.dumps({'ok': True, 'account_id': account_id, 'card_id': card_id, 'created': created})
+    )
 
 
 if __name__ == '__main__':

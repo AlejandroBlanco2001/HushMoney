@@ -4,6 +4,7 @@ Read current bank registry for Hermes context.
 Usage: python3 get_bank_context.py [--bank SLUG]
 Output: JSON with bank list or single bank detail.
 """
+
 from __future__ import annotations
 
 import argparse

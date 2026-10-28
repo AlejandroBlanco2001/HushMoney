@@ -8,7 +8,6 @@ import pytest
 
 from forwarder.imap import (
     Email,
-    _decode_header,
     _extract_plain_text,
     _resolve_original_sender,
     parse_email_bytes,
@@ -24,11 +23,14 @@ BANK_DOMAIN = 'notificacionesbancolombia.com'
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _load_fixture(name: str) -> bytes:
     return (FIXTURES_DIR / name).read_bytes()
 
 
-def _make_msg(headers: dict[str, str], body: str, content_type: str = 'text/plain') -> email_lib.message.Message:
+def _make_msg(
+    headers: dict[str, str], body: str, content_type: str = 'text/plain'
+) -> email_lib.message.Message:
     raw = ''
     for k, v in headers.items():
         raw += f'{k}: {v}\n'
@@ -59,15 +61,19 @@ def _make_multipart(plain: str, html: str) -> email_lib.message.Message:
 # parse_email_bytes — fixture round-trips
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize('fixture', [
-    'compra_debito.eml',
-    'pago_boton.eml',
-    'transferencia_enviada.eml',
-    'transferencia_recibida.eml',
-    'retiro_atm.eml',
-    'compra_credito.eml',
-    'forwarded_auto.eml',
-])
+
+@pytest.mark.parametrize(
+    'fixture',
+    [
+        'compra_debito.eml',
+        'pago_boton.eml',
+        'transferencia_enviada.eml',
+        'transferencia_recibida.eml',
+        'retiro_atm.eml',
+        'compra_credito.eml',
+        'forwarded_auto.eml',
+    ],
+)
 def test_parse_email_bytes_fixture(fixture: str) -> None:
     raw = _load_fixture(fixture)
     result = parse_email_bytes(raw)
@@ -77,14 +83,17 @@ def test_parse_email_bytes_fixture(fixture: str) -> None:
     assert result.body, f'{fixture}: body should not be empty'
 
 
-@pytest.mark.parametrize('fixture', [
-    'compra_debito.eml',
-    'pago_boton.eml',
-    'transferencia_enviada.eml',
-    'transferencia_recibida.eml',
-    'retiro_atm.eml',
-    'compra_credito.eml',
-])
+@pytest.mark.parametrize(
+    'fixture',
+    [
+        'compra_debito.eml',
+        'pago_boton.eml',
+        'transferencia_enviada.eml',
+        'transferencia_recibida.eml',
+        'retiro_atm.eml',
+        'compra_credito.eml',
+    ],
+)
 def test_parse_email_bytes_bank_sender(fixture: str) -> None:
     raw = _load_fixture(fixture)
     result = parse_email_bytes(raw)
@@ -111,6 +120,7 @@ def test_parse_email_bytes_no_body_returns_none() -> None:
 # ---------------------------------------------------------------------------
 # _resolve_original_sender
 # ---------------------------------------------------------------------------
+
 
 def test_resolve_sender_direct_email() -> None:
     msg = _make_msg({'From': 'bank@example.com', 'Subject': 'Test'}, 'body')
@@ -157,6 +167,7 @@ def test_resolve_sender_prefers_x_original_from_over_x_forwarded_from() -> None:
 # ---------------------------------------------------------------------------
 # _extract_plain_text
 # ---------------------------------------------------------------------------
+
 
 def test_extract_plain_text_simple() -> None:
     msg = _make_msg({'From': 'a@b.com'}, 'Hello world')

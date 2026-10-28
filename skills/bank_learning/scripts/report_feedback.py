@@ -7,6 +7,7 @@ Usage:
 
 Output: {"ok": true, "proposal_id": "..."}
 """
+
 from __future__ import annotations
 
 import argparse
@@ -16,9 +17,7 @@ import uuid
 from pathlib import Path
 
 
-INBOX_DIR = os.environ.get(
-    'HUSHMONEY_INBOX', os.path.expanduser('~/.hermes/pattern-inbox')
-)
+INBOX_DIR = os.environ.get('HUSHMONEY_INBOX', os.path.expanduser('~/.hermes/pattern-inbox'))
 
 
 def main() -> None:

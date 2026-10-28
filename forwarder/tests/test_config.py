@@ -16,8 +16,14 @@ BASE_ENV = {
 def test_load_minimal(monkeypatch: pytest.MonkeyPatch) -> None:
     for k, v in BASE_ENV.items():
         monkeypatch.setenv(k, v)
-    for k in ('IMAP_PORT', 'IMAP_MAILBOX', 'POLL_INTERVAL_SECONDS', 'DRY_RUN',
-              'HERMES_GATEWAY_URL', 'HERMES_GATEWAY_SECRET'):
+    for k in (
+        'IMAP_PORT',
+        'IMAP_MAILBOX',
+        'POLL_INTERVAL_SECONDS',
+        'DRY_RUN',
+        'HERMES_GATEWAY_URL',
+        'HERMES_GATEWAY_SECRET',
+    ):
         monkeypatch.delenv(k, raising=False)
 
     cfg = config.load()
@@ -66,12 +72,15 @@ def test_load_dry_run_variants(monkeypatch: pytest.MonkeyPatch) -> None:
         assert config.load().dry_run is False
 
 
-@pytest.mark.parametrize('missing_key', [
-    'IMAP_HOST',
-    'IMAP_USERNAME',
-    'IMAP_PASSWORD',
-    'BANK_SENDER_EMAILS',
-])
+@pytest.mark.parametrize(
+    'missing_key',
+    [
+        'IMAP_HOST',
+        'IMAP_USERNAME',
+        'IMAP_PASSWORD',
+        'BANK_SENDER_EMAILS',
+    ],
+)
 def test_load_missing_required_raises(monkeypatch: pytest.MonkeyPatch, missing_key: str) -> None:
     for k, v in BASE_ENV.items():
         monkeypatch.setenv(k, v)

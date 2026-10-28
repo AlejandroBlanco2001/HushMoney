@@ -4,6 +4,7 @@ Return all unsettled debts, grouped by person.
 Usage: python3 get_active_debts.py [--person "João"]
 Output: {"debts": [...], "summary": {"João": {"net": 35.0, "currency": "USD", ...}}, "count": N}
 """
+
 from __future__ import annotations
 
 import argparse

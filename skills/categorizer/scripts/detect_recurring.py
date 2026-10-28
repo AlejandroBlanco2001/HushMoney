@@ -12,6 +12,7 @@ Usage: python3 detect_recurring.py --merchant "NETFLIX"
 Output: {"is_recurring": true,  "months_found": 6, "median_day": 15}
         {"is_recurring": false, "months_found": 2}
 """
+
 from __future__ import annotations
 
 import argparse
@@ -20,7 +21,7 @@ import os
 import sqlite3
 
 
-DB_PATH = os.environ.get("HUSHMONEY_DB", os.path.expanduser("~/.hermes/hushmoney.db"))
+DB_PATH = os.environ.get('HUSHMONEY_DB', os.path.expanduser('~/.hermes/hushmoney.db'))
 
 MIN_MONTHS = 4
 DAY_TOLERANCE = 3
@@ -32,10 +33,10 @@ def _normalize_day(dom: int) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--merchant", required=True)
+    parser.add_argument('--merchant', required=True)
     args = parser.parse_args()
 
-    name = " ".join(args.merchant.split()).upper()
+    name = ' '.join(args.merchant.split()).upper()
 
     con = sqlite3.connect(DB_PATH)
     rows = con.execute(
@@ -61,7 +62,7 @@ def main() -> None:
 
     months_found = len(seen)
     if months_found < MIN_MONTHS:
-        print(json.dumps({"is_recurring": False, "months_found": months_found}))
+        print(json.dumps({'is_recurring': False, 'months_found': months_found}))
         return
 
     days = sorted(seen.values())
@@ -69,13 +70,17 @@ def main() -> None:
     consistent = sum(1 for d in days if abs(d - median_day) <= DAY_TOLERANCE)
 
     is_recurring = consistent >= MIN_MONTHS
-    print(json.dumps({
-        "is_recurring": is_recurring,
-        "months_found": months_found,
-        "median_day": median_day,
-        "consistent_months": consistent,
-    }))
+    print(
+        json.dumps(
+            {
+                'is_recurring': is_recurring,
+                'months_found': months_found,
+                'median_day': median_day,
+                'consistent_months': consistent,
+            }
+        )
+    )
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

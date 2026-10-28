@@ -17,6 +17,7 @@ Usage:
 Output: {"ok": true, "id": "<uuid>", "duplicate": false}
         {"ok": true, "duplicate": true}   (hash already present — no insert)
 """
+
 from __future__ import annotations
 
 import argparse
@@ -54,27 +55,35 @@ def _find_or_create_account(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument('--amount',           type=float, required=True)
-    parser.add_argument('--currency',         required=True)
-    parser.add_argument('--date',             required=True, help='ISO 8601 UTC')
-    parser.add_argument('--transaction-type', required=True,
-                        choices=['debit', 'credit', 'cash', 'transfer_in', 'transfer_out',
-                                 'payment', 'top_up'])
-    parser.add_argument('--account-type',     required=True,
-                        choices=['checking', 'savings', 'credit', 'digital_wallet'])
-    parser.add_argument('--channel',          required=True, choices=['email', 'sms'])
-    parser.add_argument('--merchant',        default=None)
-    parser.add_argument('--bank',            default='unknown')
-    parser.add_argument('--message-hash',    default=None,
-                        help='SHA-256 hex fingerprint for dedup; computed if omitted')
-    parser.add_argument('--template-id',     default=None)
-    parser.add_argument('--pattern-status',  default='active',
-                        choices=['active', 'candidate'])
+    parser.add_argument('--amount', type=float, required=True)
+    parser.add_argument('--currency', required=True)
+    parser.add_argument('--date', required=True, help='ISO 8601 UTC')
+    parser.add_argument(
+        '--transaction-type',
+        required=True,
+        choices=['debit', 'credit', 'cash', 'transfer_in', 'transfer_out', 'payment', 'top_up'],
+    )
+    parser.add_argument(
+        '--account-type', required=True, choices=['checking', 'savings', 'credit', 'digital_wallet']
+    )
+    parser.add_argument('--channel', required=True, choices=['email', 'sms'])
+    parser.add_argument('--merchant', default=None)
+    parser.add_argument('--bank', default='unknown')
+    parser.add_argument(
+        '--message-hash',
+        default=None,
+        help='SHA-256 hex fingerprint for dedup; computed if omitted',
+    )
+    parser.add_argument('--template-id', default=None)
+    parser.add_argument('--pattern-status', default='active', choices=['active', 'candidate'])
     args = parser.parse_args()
 
-    message_hash = args.message_hash or hashlib.sha256(
-        f'{args.amount}:{args.date}:{args.transaction_type}:{args.account_type}'.encode()
-    ).hexdigest()
+    message_hash = (
+        args.message_hash
+        or hashlib.sha256(
+            f'{args.amount}:{args.date}:{args.transaction_type}:{args.account_type}'.encode()
+        ).hexdigest()
+    )
 
     con = sqlite3.connect(DB_PATH)
     try:
@@ -92,15 +101,26 @@ def main() -> None:
             )
             transaction_id = str(uuid.uuid4())
             con.execute(
-                '''INSERT INTO transactions
+                """INSERT INTO transactions
                    (id, account_id, amount, currency, merchant, date,
                     transaction_type, channel, message_hash,
                     template_id, pattern_status, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                (transaction_id, account_id, args.amount, args.currency,
-                 args.merchant, args.date, args.transaction_type,
-                 args.channel, message_hash,
-                 args.template_id, args.pattern_status, now, now),
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    transaction_id,
+                    account_id,
+                    args.amount,
+                    args.currency,
+                    args.merchant,
+                    args.date,
+                    args.transaction_type,
+                    args.channel,
+                    message_hash,
+                    args.template_id,
+                    args.pattern_status,
+                    now,
+                    now,
+                ),
             )
     finally:
         con.close()

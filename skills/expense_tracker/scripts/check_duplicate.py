@@ -3,6 +3,7 @@ Check whether a message_hash already exists in the transactions table.
 Usage: python3 check_duplicate.py --hash <sha256_hex>
 Output: {"duplicate": true|false}
 """
+
 from __future__ import annotations
 
 import argparse

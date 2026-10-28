@@ -10,6 +10,7 @@ Output JSON:
   { "success": true, "unseen_from_bank": N }
   { "success": false, "error": "auth"|"connection"|"sender_not_found", "detail": "..." }
 """
+
 from __future__ import annotations
 
 import argparse
@@ -21,11 +22,11 @@ import ssl
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument('--host',     required=True)
-    parser.add_argument('--port',     type=int, default=993)
+    parser.add_argument('--host', required=True)
+    parser.add_argument('--port', type=int, default=993)
     parser.add_argument('--username', required=True)
     parser.add_argument('--password', required=True)
-    parser.add_argument('--senders',  default='')
+    parser.add_argument('--senders', default='')
     args = parser.parse_args()
 
     senders = [s.strip() for s in args.senders.split(',') if s.strip()]
@@ -53,8 +54,7 @@ def main() -> None:
     conn.logout()
 
     if senders and unseen == 0:
-        print(json.dumps({'success': True, 'unseen_from_bank': 0,
-                          'error': 'sender_not_found'}))
+        print(json.dumps({'success': True, 'unseen_from_bank': 0, 'error': 'sender_not_found'}))
     else:
         print(json.dumps({'success': True, 'unseen_from_bank': unseen}))
 

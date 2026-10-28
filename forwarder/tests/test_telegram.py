@@ -9,8 +9,7 @@ import httpx
 import pytest
 from starlette.testclient import TestClient
 
-from forwarder.channels.telegram import COMMANDS, MAX_BODY_BYTES, create_app
-from forwarder.channels.telegram import TelegramConfig
+from forwarder.channels.telegram import COMMANDS, MAX_BODY_BYTES, TelegramConfig, create_app
 
 
 FIXTURES = Path(__file__).resolve().parents[2] / 'tests' / 'fixtures'
@@ -119,16 +118,20 @@ def test_unrecognized_text_never_falls_through_to_chat(harness, update, text):
 
 def test_push_from_unknown_app_routed_to_learning(cfg):
     """Unknown-app push notifications are handed to UnmatchedHandler (redacted, no raw text)."""
+
     from forwarder.learning.unmatched import UnmatchedHandler
-    from forwarder.learning.store import PatternStore
-    import tempfile, pathlib
 
     captured: list[dict] = []
 
     class _FakeStore:
-        def get_fingerprint(self, fp): return None
-        def upsert_fingerprint(self, *a, **kw): pass
-        def upsert_fingerprint_state(self, *a): pass
+        def get_fingerprint(self, fp):
+            return None
+
+        def upsert_fingerprint(self, *a, **kw):
+            pass
+
+        def upsert_fingerprint_state(self, *a):
+            pass
 
     class _CaptureHandler(UnmatchedHandler):
         def __init__(self):

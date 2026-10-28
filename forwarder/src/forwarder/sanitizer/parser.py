@@ -62,19 +62,19 @@ def _auto_parse_amount(raw: str) -> float | None:
     try:
         if has_dot and has_comma:
             if raw.rfind('.') > raw.rfind(','):
-                return float(raw.replace(',', ''))           # 1,000.00 → 1000.00
+                return float(raw.replace(',', ''))  # 1,000.00 → 1000.00
             else:
                 return float(raw.replace('.', '').replace(',', '.'))  # 1.000,00 → 1000.00
         elif has_dot:
             if re.search(r'\.\d{1,2}$', raw):
-                return float(raw)                            # 1000.50
+                return float(raw)  # 1000.50
             else:
-                return float(raw.replace('.', ''))           # 1.000 → 1000
+                return float(raw.replace('.', ''))  # 1.000 → 1000
         elif has_comma:
             if re.search(r',\d{1,2}$', raw):
-                return float(raw.replace(',', '.'))          # 1000,50 → 1000.50
+                return float(raw.replace(',', '.'))  # 1000,50 → 1000.50
             else:
-                return float(raw.replace(',', ''))           # 1,000 → 1000
+                return float(raw.replace(',', ''))  # 1,000 → 1000
         else:
             return float(raw)
     except ValueError:

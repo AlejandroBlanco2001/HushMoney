@@ -5,16 +5,17 @@ Usage:
   python3 propose_pattern.py \
     --bank davivienda --channel sms \
     --template-key debit_checking \
-    --regex '(?P<amount>[\d.,]+).*COMPRA' \
+    --regex '(?P<amount>[\\d.,]+).*COMPRA' \
     --sample 'Compra por $123.456,78 en TIENDA' \
     --fingerprint abc123 \
     --expected '{"amount": 123456.78, "transaction_type": "debit", \
                  "account_type": "checking", "date": "2026-01-02T10:20:00Z"}' \
-    [--date-regex '(?P<day>\d{2})/(?P<month>\d{2})/(?P<year>\d{4})'] \
+    [--date-regex '(?P<day>\\d{2})/(?P<month>\\d{2})/(?P<year>\\d{4})'] \
     [--bank-profile '{"slug":"davivienda","currency":"COP",...}']
 
 Output: {"ok": true, "proposal_id": "..."} or {"ok": false, "error": "..."}
 """
+
 from __future__ import annotations
 
 import argparse
@@ -24,9 +25,7 @@ import uuid
 from pathlib import Path
 
 
-INBOX_DIR = os.environ.get(
-    'HUSHMONEY_INBOX', os.path.expanduser('~/.hermes/pattern-inbox')
-)
+INBOX_DIR = os.environ.get('HUSHMONEY_INBOX', os.path.expanduser('~/.hermes/pattern-inbox'))
 
 
 def main() -> None:
@@ -37,7 +36,9 @@ def main() -> None:
     parser.add_argument('--regex', required=True)
     parser.add_argument('--sample', required=True)
     parser.add_argument('--fingerprint', required=True)
-    parser.add_argument('--expected', required=True, help='JSON with amount, transaction_type, account_type, date')
+    parser.add_argument(
+        '--expected', required=True, help='JSON with amount, transaction_type, account_type, date'
+    )
     parser.add_argument('--date-regex', default=None)
     parser.add_argument('--bank-profile', default=None, help='JSON bank profile for unknown banks')
     args = parser.parse_args()

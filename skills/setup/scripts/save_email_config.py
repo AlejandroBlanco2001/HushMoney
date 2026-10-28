@@ -7,6 +7,7 @@ Usage:
                                --port 993 --username user@gmail.com
                                --bank-senders "a@bank.com,b@bank.com"
 """
+
 from __future__ import annotations
 
 import argparse
@@ -29,23 +30,24 @@ def upsert(con: sqlite3.Connection, key: str, value: str, now: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument('--provider',     required=True,
-                        choices=['gmail', 'yahoo', 'outlook_forward', 'other'])
-    parser.add_argument('--host',         required=True)
-    parser.add_argument('--port',         type=int, default=993)
-    parser.add_argument('--username',     required=True)
+    parser.add_argument(
+        '--provider', required=True, choices=['gmail', 'yahoo', 'outlook_forward', 'other']
+    )
+    parser.add_argument('--host', required=True)
+    parser.add_argument('--port', type=int, default=993)
+    parser.add_argument('--username', required=True)
     parser.add_argument('--bank-senders', required=True)
     args = parser.parse_args()
 
     now = datetime.now(UTC).isoformat()
     con = sqlite3.connect(DB_PATH)
     with con:
-        upsert(con, 'email_provider',     args.provider,     now)
-        upsert(con, 'imap_host',          args.host,         now)
-        upsert(con, 'imap_port',          str(args.port),    now)
-        upsert(con, 'imap_username',      args.username,     now)
+        upsert(con, 'email_provider', args.provider, now)
+        upsert(con, 'imap_host', args.host, now)
+        upsert(con, 'imap_port', str(args.port), now)
+        upsert(con, 'imap_username', args.username, now)
         upsert(con, 'bank_sender_emails', args.bank_senders, now)
-        upsert(con, 'setup_step',         'sms',             now)
+        upsert(con, 'setup_step', 'sms', now)
     con.close()
 
     print(json.dumps({'ok': True, 'provider': args.provider, 'username': args.username}))

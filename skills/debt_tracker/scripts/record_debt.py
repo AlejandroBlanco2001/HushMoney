@@ -7,6 +7,7 @@ Usage:
 
 Output: {"ok": true, "id": "<uuid>"}
 """
+
 from __future__ import annotations
 
 import argparse
@@ -22,10 +23,10 @@ DB_PATH = os.environ.get('HUSHMONEY_DB', os.path.expanduser('~/.hermes/hushmoney
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument('--person',      required=True)
-    parser.add_argument('--amount',      type=float, required=True)
-    parser.add_argument('--currency',    default='COP')
-    parser.add_argument('--direction',   required=True, choices=['i_owe', 'they_owe'])
+    parser.add_argument('--person', required=True)
+    parser.add_argument('--amount', type=float, required=True)
+    parser.add_argument('--currency', default='COP')
+    parser.add_argument('--direction', required=True, choices=['i_owe', 'they_owe'])
     parser.add_argument('--description', default=None)
     args = parser.parse_args()
 
@@ -35,10 +36,17 @@ def main() -> None:
     con = sqlite3.connect(DB_PATH)
     with con:
         con.execute(
-            '''INSERT INTO debts (id, person, amount, currency, direction, description, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)''',
-            (debt_id, args.person, args.amount, args.currency,
-             args.direction, args.description, now),
+            """INSERT INTO debts (id, person, amount, currency, direction, description, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (
+                debt_id,
+                args.person,
+                args.amount,
+                args.currency,
+                args.direction,
+                args.description,
+                now,
+            ),
         )
     con.close()
 

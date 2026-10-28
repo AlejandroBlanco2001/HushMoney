@@ -5,6 +5,7 @@ Returns JSON:
   {"ready": false}                         — file missing or still has DELETE THIS line
   {"ready": true, "loaded": N, "skipped": N, "accounts": [...]}  — parsed and loaded
 """
+
 from __future__ import annotations
 
 import json
@@ -100,8 +101,7 @@ def _save_account(con: sqlite3.Connection, acc: dict) -> tuple[str, str | None, 
         con.execute(
             'INSERT INTO accounts (id, bank, alias, type, currency, masked_number, created_at)'
             ' VALUES (?, ?, ?, ?, ?, ?, ?)',
-            (account_id, acc['bank'], acc['alias'], acc['type'],
-             acc['currency'], masked, now),
+            (account_id, acc['bank'], acc['alias'], acc['type'], acc['currency'], masked, now),
         )
         created = True
 
@@ -156,14 +156,16 @@ def main() -> None:
                 loaded += 1
             else:
                 skipped += 1
-            results.append({
-                'bank': acc['bank'],
-                'type': acc['type'],
-                'alias': acc['alias'],
-                'account_id': account_id,
-                'card_id': card_id,
-                'created': created,
-            })
+            results.append(
+                {
+                    'bank': acc['bank'],
+                    'type': acc['type'],
+                    'alias': acc['alias'],
+                    'account_id': account_id,
+                    'card_id': card_id,
+                    'created': created,
+                }
+            )
 
     con.close()
     print(json.dumps({'ready': True, 'loaded': loaded, 'skipped': skipped, 'accounts': results}))

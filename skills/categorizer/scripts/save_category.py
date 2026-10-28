@@ -4,6 +4,7 @@ Set or update the category on a transaction.
 Usage: python3 save_category.py --id <tx_uuid> --category food
 Output: {"ok": true}
 """
+
 from __future__ import annotations
 
 import argparse
@@ -30,7 +31,7 @@ def main() -> None:
             (args.category, now, args.id),
         )
     con.close()
-    print(json.dumps({"ok": True}))
+    print(json.dumps({'ok': True}))
 
 
 if __name__ == '__main__':
