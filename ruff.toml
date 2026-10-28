@@ -1,0 +1,47 @@
+# Repo-wide Ruff config. Mirrors forwarder/pyproject.toml so the whole tree
+# (evals/, skills/, scripts/, gateway_server.py, root tests/) is held to the
+# same standard. The forwarder/ package keeps its own nearest config.
+line-length = 100
+target-version = "py312"
+
+[format]
+quote-style = "single"
+skip-magic-trailing-comma = false
+indent-style = "space"
+docstring-code-format = true
+
+[lint]
+select = [
+  "E",    # pycodestyle errors
+  "W",    # pycodestyle warnings
+  "F",    # pyflakes
+  "I",    # isort
+  "B",    # flake8-bugbear
+  "C4",   # flake8-comprehensions
+  "UP",   # pyupgrade
+  "SIM",  # flake8-simplify
+  "N",    # pep8-naming
+  "ANN",  # flake8-annotations
+  "S",    # flake8-bandit (security)
+  "RUF",  # ruff-specific rules
+  "PT",   # flake8-pytest-style
+  "ERA",  # eradicate (commented-out code)
+  "ASYNC",# flake8-async
+]
+ignore = [
+  "S101",    # use of assert (common in tests and script guards)
+]
+
+[lint.isort]
+force-single-line = false
+lines-after-imports = 2
+
+[lint.per-file-ignores]
+# Standalone run-as-scripts (not an importable typed library): full annotation
+# coverage is not required; subprocess/CLI patterns trip bandit benignly; and
+# ambiguous-unicode fires on intentional typography (en dashes) and deliberate
+# CSV-injection test fixtures (fullwidth '=' payloads).
+"evals/**/*.py" = ["ANN", "S603", "S607", "RUF001", "RUF002", "RUF003"]
+"skills/**/*.py" = ["ANN", "S603", "S607", "RUF001", "RUF002", "RUF003"]
+"scripts/**/*.py" = ["ANN", "S603", "S607", "RUF001", "RUF002", "RUF003"]
+"tests/**/*.py" = ["ANN", "S", "ERA"]

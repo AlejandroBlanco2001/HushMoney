@@ -6,6 +6,25 @@ on:
     branches: [main]
 
 jobs:
+  lint:
+    name: Lint & format (Ruff)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      # Lint and format-check the whole repo. The forwarder/ package uses its
+      # own nearest config; everything else uses the root ruff.toml.
+      - name: Ruff check
+        run: uvx ruff check .
+
+      - name: Ruff format check
+        run: uvx ruff format --check .
+
   test:
     name: Tests (Python 3.12)
     runs-on: ubuntu-latest
