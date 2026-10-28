@@ -42,7 +42,8 @@ def main() -> None:
     with con:
         cur = con.execute(
             """INSERT INTO learned_patterns
-               (bank_slug, country, channel, pattern, confirmed, uses, active, created_at, updated_at)
+               (bank_slug, country, channel, pattern, confirmed, uses, active,
+                created_at, updated_at)
                VALUES (?, ?, ?, ?, ?, 0, 1, ?, ?)""",
             (
                 args.bank,

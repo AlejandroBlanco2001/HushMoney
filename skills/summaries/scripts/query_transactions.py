@@ -248,7 +248,7 @@ def fetch_income(
         GROUP BY t.currency
     """
     params = [_to_utc(start), _to_utc(end), *INCOME_TYPES, *([bank] if bank else [])]
-    return {currency: total for currency, total in con.execute(sql, params)}
+    return dict(con.execute(sql, params))
 
 
 def to_transaction(row: sqlite3.Row) -> dict[str, object]:
@@ -306,7 +306,8 @@ def spending_trend(current_total: float, previous_total: float) -> Trend:
             'direction': 'no_data',
         }
     delta_pct = round(delta_amount / previous_total * 100, 1) + 0.0  # + 0.0 turns -0.0 into 0.0
-    if abs(delta_pct) < FLAT_THRESHOLD_PCT:
+    # Kept as a block: the equivalent nested ternary would exceed the line length.
+    if abs(delta_pct) < FLAT_THRESHOLD_PCT:  # noqa: SIM108
         direction = 'flat'
     else:
         direction = 'up' if delta_pct > 0 else 'down'
@@ -392,7 +393,8 @@ def _trend_suffix(trend: Trend | None, period: str) -> str:
 
 def _category_lines(entries: list[CategorySpending], period: str) -> str:
     return '\n'.join(
-        f'  {e["emoji"]} {e["label"]}: {format_money(e["total"], e["currency"])}{_trend_suffix(e["trend"], period)}'
+        f'  {e["emoji"]} {e["label"]}: {format_money(e["total"], e["currency"])}'
+        f'{_trend_suffix(e["trend"], period)}'
         for e in entries
         if e['total'] > 0
     )

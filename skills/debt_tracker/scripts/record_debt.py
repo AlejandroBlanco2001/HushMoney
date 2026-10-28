@@ -3,7 +3,8 @@ Record money owed to or from the user.
 
 Usage:
   python3 record_debt.py --person "João" --amount 35 --currency USD --direction they_owe
-  python3 record_debt.py --person "Laura" --amount 12000 --currency COP --direction i_owe --description "lunch"
+  python3 record_debt.py --person "Laura" --amount 12000 --currency COP \
+      --direction i_owe --description "lunch"
 
 Output: {"ok": true, "id": "<uuid>"}
 """

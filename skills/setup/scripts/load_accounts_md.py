@@ -27,7 +27,8 @@ VALID_BANKS = {'bancolombia', 'davivienda', 'nequi', 'bbva'}
 
 def _ensure_schema(con: sqlite3.Connection) -> None:
     if os.path.isfile(SCHEMA_PATH):
-        con.executescript(open(SCHEMA_PATH).read())
+        with open(SCHEMA_PATH) as f:
+            con.executescript(f.read())
 
 
 def _parse_md(text: str) -> list[dict]:
@@ -134,7 +135,7 @@ def main() -> None:
 
     text = path.read_text(encoding='utf-8')
 
-    first_line = next((l for l in text.splitlines() if l.strip()), '')
+    first_line = next((line for line in text.splitlines() if line.strip()), '')
     if 'DELETE THIS' in first_line:
         print(json.dumps({'ready': False, 'reason': 'template_not_filled'}))
         return

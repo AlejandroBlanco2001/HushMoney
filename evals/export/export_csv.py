@@ -73,7 +73,7 @@ def _seed(db_path: str) -> None:
         " VALUES ('card-1', 'acc-co', 'debit', '****5678', 'Visa', ?)",
         (NOW,),
     )
-    # (id, card, amount, merchant, date, type, channel, category)
+    # columns: id, card, amount, merchant, date, type, channel, category
     rows = [
         ('t1', 'card-1', 35000, 'El Corral', '2026-09-15T14:32:00Z', 'debit', 'sms', 'food'),
         ('t2', None, 4500000, None, '2026-09-15T18:00:00Z', 'transfer_in', 'email', 'transfers'),

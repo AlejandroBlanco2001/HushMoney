@@ -64,7 +64,7 @@ def main() -> None:
             cats = [{'slug': r[0], 'label': r[1], 'description': r[2]} for r in rows]
             print(json.dumps({'categories': cats}))
             return
-    except Exception:
+    except Exception:  # noqa: S110  # best-effort DB read; falls through to defaults below
         pass
 
     print(json.dumps({'categories': _DEFAULT_CATEGORIES}))

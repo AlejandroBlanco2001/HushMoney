@@ -87,7 +87,7 @@ def summarize(db_path: str, now_utc: str, *args: str, verbose: bool = False) -> 
     if verbose:
         print(
             f'    $ {" ".join(args)} @ {now_utc}\n'
-            + '\n'.join(f'      {l}' for l in (out['text'] or '').splitlines())
+            + '\n'.join(f'      {line}' for line in (out['text'] or '').splitlines())
         )
     return out
 

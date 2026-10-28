@@ -59,7 +59,7 @@ def _get_categories() -> list[str]:
         con.close()
         if rows:
             return [r[0] for r in rows]
-    except Exception:
+    except Exception:  # noqa: S110  # best-effort DB read; falls back to defaults
         pass
     return _FALLBACK_CATEGORIES
 
@@ -117,7 +117,7 @@ def _extract_result(text: str, categories: list[str]) -> dict:
             if m:
                 return _parse({'category': m.group(1)})
 
-    all_cats = categories + ['needs_clarification']
+    all_cats = [*categories, 'needs_clarification']
     for cat in all_cats:
         if re.search(rf'\b{re.escape(cat)}\b', text, re.IGNORECASE):
             return _parse({'category': cat})

@@ -131,7 +131,7 @@ def call_model(
         ],
         max_tokens=256,
     )
-    result = api.extract_json(resp['content'], valid_values=categories + ['needs_clarification'])
+    result = api.extract_json(resp['content'], valid_values=[*categories, 'needs_clarification'])
     return {
         'category': str(result.get('category') or result.get('_scanned') or 'unknown')
         .lower()
@@ -241,7 +241,8 @@ def score() -> None:
     print(f'HERMES MODEL SELECTION  ({len(labeled)} labeled / {len(cases)} total fixtures)')
     print(f'{"=" * 76}\n')
     print(
-        f'  {"Model":<28} {"Acc":>5}  {"Avg latency":>11}  {"Tokens in/out":>14}  {"$/1K calls":>10}'
+        f'  {"Model":<28} {"Acc":>5}  {"Avg latency":>11}  '
+        f'{"Tokens in/out":>14}  {"$/1K calls":>10}'
     )
     print(f'  {"-" * 74}')
 

@@ -38,10 +38,15 @@ lines-after-imports = 2
 
 [lint.per-file-ignores]
 # Standalone run-as-scripts (not an importable typed library): full annotation
-# coverage is not required; subprocess/CLI patterns trip bandit benignly; and
-# ambiguous-unicode fires on intentional typography (en dashes) and deliberate
-# CSV-injection test fixtures (fullwidth '=' payloads).
-"evals/**/*.py" = ["ANN", "S603", "S607", "RUF001", "RUF002", "RUF003"]
-"skills/**/*.py" = ["ANN", "S603", "S607", "RUF001", "RUF002", "RUF003"]
-"scripts/**/*.py" = ["ANN", "S603", "S607", "RUF001", "RUF002", "RUF003"]
+# coverage is not required; subprocess/CLI patterns trip bandit benignly
+# (S603/S607); S310 flags deliberate urllib calls to the configured LLM API;
+# S608 flags dynamic SQL that only ever interpolates fixed identifiers and `?`
+# placeholders (never user data); and ambiguous-unicode fires on intentional
+# typography (en dashes) and deliberate CSV-injection test fixtures.
+"evals/**/*.py" = ["ANN", "S603", "S607", "S310", "S608", "RUF001", "RUF002", "RUF003"]
+"skills/**/*.py" = ["ANN", "S603", "S607", "S310", "S608", "RUF001", "RUF002", "RUF003"]
+"scripts/**/*.py" = ["ANN", "S603", "S607", "S310", "S608", "RUF001", "RUF002", "RUF003"]
 "tests/**/*.py" = ["ANN", "S", "ERA"]
+# Embedded LLM rubric prompt: wrapping its lines would change the text the
+# judge model receives and could shift grading.
+"evals/summaries/judge.py" = ["E501"]

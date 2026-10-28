@@ -3,9 +3,12 @@ Look up the category for a merchant from the merchants cache table.
 Falls back to transaction frequency analysis for merchants predating the cache.
 
 Usage: python3 lookup_cached_category.py --merchant "UBER RIDES"
-Output (cache hit, unambiguous):  {"found": true, "category": "transport", "needs_clarification": false}
-Output (cache hit, ambiguous):    {"found": true, "category": null, "needs_clarification": true, "last_category": "food"}
-Output (cache miss):              {"found": false, "category": null, "needs_clarification": false}
+Output (cache hit, unambiguous):
+  {"found": true, "category": "transport", "needs_clarification": false}
+Output (cache hit, ambiguous):
+  {"found": true, "category": null, "needs_clarification": true, "last_category": "food"}
+Output (cache miss):
+  {"found": false, "category": null, "needs_clarification": false}
 """
 
 from __future__ import annotations
@@ -34,7 +37,8 @@ def main() -> None:
 
     # 1. Check dedicated merchants cache first.
     row = con.execute(
-        'SELECT category, needs_clarification, last_category, COALESCE(is_recurring, 0) FROM merchants WHERE name = ?',
+        'SELECT category, needs_clarification, last_category, COALESCE(is_recurring, 0)'
+        ' FROM merchants WHERE name = ?',
         (name,),
     ).fetchone()
 

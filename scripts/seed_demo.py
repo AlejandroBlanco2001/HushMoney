@@ -32,7 +32,8 @@ def _hash(*parts: object) -> str:
 
 def _ensure_schema(con: sqlite3.Connection) -> None:
     if os.path.isfile(SCHEMA_PATH):
-        con.executescript(open(SCHEMA_PATH).read())
+        with open(SCHEMA_PATH) as f:
+            con.executescript(f.read())
 
 
 def _upsert_setting(con: sqlite3.Connection, key: str, value: str, now: str) -> None:
@@ -122,13 +123,15 @@ def _insert_debt(
     settled_at: str | None = None,
 ) -> None:
     exists = con.execute(
-        'SELECT 1 FROM debts WHERE person = ? AND amount = ? AND direction = ? AND description = ? LIMIT 1',
+        'SELECT 1 FROM debts'
+        ' WHERE person = ? AND amount = ? AND direction = ? AND description = ? LIMIT 1',
         (person, amount, direction, description),
     ).fetchone()
     if exists:
         return
     con.execute(
-        """INSERT INTO debts (id, person, amount, currency, direction, description, created_at, settled_at)
+        """INSERT INTO debts
+               (id, person, amount, currency, direction, description, created_at, settled_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             str(uuid.uuid4()),

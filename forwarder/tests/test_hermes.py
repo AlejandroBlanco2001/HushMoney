@@ -59,15 +59,19 @@ def test_dispatch_omits_auth_header_when_no_secret() -> None:
 
 
 def test_dispatch_raises_on_http_error() -> None:
-    with patch('httpx.post', return_value=_mock_response(500)):
-        with pytest.raises(httpx.HTTPStatusError):
-            dispatch(PAYLOAD, GATEWAY_URL, GATEWAY_SECRET)
+    with (
+        patch('httpx.post', return_value=_mock_response(500)),
+        pytest.raises(httpx.HTTPStatusError),
+    ):
+        dispatch(PAYLOAD, GATEWAY_URL, GATEWAY_SECRET)
 
 
 def test_dispatch_raises_on_connection_error() -> None:
-    with patch('httpx.post', side_effect=httpx.ConnectError('refused')):
-        with pytest.raises(httpx.ConnectError):
-            dispatch(PAYLOAD, GATEWAY_URL, GATEWAY_SECRET)
+    with (
+        patch('httpx.post', side_effect=httpx.ConnectError('refused')),
+        pytest.raises(httpx.ConnectError),
+    ):
+        dispatch(PAYLOAD, GATEWAY_URL, GATEWAY_SECRET)
 
 
 def test_dispatch_payload_without_merchant() -> None:

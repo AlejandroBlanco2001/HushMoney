@@ -66,7 +66,7 @@ def _resolve_bot_sync() -> None:
 
 
 class _InjectHandler(BaseHTTPRequestHandler):
-    def do_POST(self):
+    def do_POST(self) -> None:
         if self.path != '/inject':
             self.send_response(404)
             self.send_header('Content-Length', '0')
@@ -85,7 +85,7 @@ class _InjectHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b'ok')
 
-    def log_message(self, *args):
+    def log_message(self, *args: object) -> None:
         pass
 
 
@@ -156,7 +156,8 @@ def main() -> None:
     # Capture the loop that app.run() will use — same as the main thread's default loop.
     _app_loop = asyncio.get_event_loop()
 
-    server = HTTPServer(('0.0.0.0', INJECT_PORT), _InjectHandler)
+    # Container-internal inject port; bind-all is intentional.
+    server = HTTPServer(('0.0.0.0', INJECT_PORT), _InjectHandler)  # noqa: S104
     Thread(target=server.serve_forever, daemon=True).start()
     Thread(target=_sender_thread, daemon=True).start()
     print(f'Inject server listening on 0.0.0.0:{INJECT_PORT}', flush=True)

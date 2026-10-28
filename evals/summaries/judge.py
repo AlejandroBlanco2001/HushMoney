@@ -225,7 +225,7 @@ def judge_summary(api_key: str, model_id: str, fixture: Fixture, summary: str) -
 
 def _as_int(value: Any) -> int:
     try:
-        return int(round(float(value)))
+        return round(float(value))
     except (TypeError, ValueError):
         return 0
 

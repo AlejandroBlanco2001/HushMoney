@@ -46,22 +46,26 @@ def _seed_db(db_path: str) -> None:
 
     # Seed merchants
     con.execute(
-        'INSERT INTO merchants (name, category, needs_clarification, last_category, is_recurring, created_at, updated_at)'
+        'INSERT INTO merchants (name, category, needs_clarification,'
+        ' last_category, is_recurring, created_at, updated_at)'
         ' VALUES (?, ?, ?, ?, ?, ?, ?)',
         ('NETFLIX', 'entertainment', 0, None, 1, now, now),
     )
     con.execute(
-        'INSERT INTO merchants (name, category, needs_clarification, last_category, is_recurring, created_at, updated_at)'
+        'INSERT INTO merchants (name, category, needs_clarification,'
+        ' last_category, is_recurring, created_at, updated_at)'
         ' VALUES (?, ?, ?, ?, ?, ?, ?)',
         ('UBER RIDES', 'transport', 0, None, 0, now, now),
     )
     con.execute(
-        'INSERT INTO merchants (name, category, needs_clarification, last_category, is_recurring, created_at, updated_at)'
+        'INSERT INTO merchants (name, category, needs_clarification,'
+        ' last_category, is_recurring, created_at, updated_at)'
         ' VALUES (?, ?, ?, ?, ?, ?, ?)',
         ('RAPPI', None, 1, 'food', 0, now, now),
     )
     con.execute(
-        'INSERT INTO merchants (name, category, needs_clarification, last_category, is_recurring, created_at, updated_at)'
+        'INSERT INTO merchants (name, category, needs_clarification,'
+        ' last_category, is_recurring, created_at, updated_at)'
         ' VALUES (?, ?, ?, ?, ?, ?, ?)',
         ('PEXTO CAPITAL SAS', None, 1, None, 0, now, now),
     )
@@ -224,7 +228,8 @@ def run_case(case: Case, db_path: str, verbose: bool) -> tuple[bool, str]:
 
     if result.get('needs_clarification') != case.expect_needs_clarification:
         failures.append(
-            f'needs_clarification={result.get("needs_clarification")} want {case.expect_needs_clarification}'
+            f'needs_clarification={result.get("needs_clarification")} '
+            f'want {case.expect_needs_clarification}'
         )
 
     if case.expect_category is not None and result.get('category') != case.expect_category:

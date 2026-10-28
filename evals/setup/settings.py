@@ -217,8 +217,10 @@ def _check_fresh_db_categories(verbose: bool) -> None:
         try:
             with con:
                 con.execute(
-                    'INSERT INTO accounts (id, bank, alias, type, currency, masked_number, created_at)'
-                    " VALUES ('acc', 'bancolombia', 'Ahorros', 'checking', 'COP', '****1234', 'now')"
+                    'INSERT INTO accounts'
+                    ' (id, bank, alias, type, currency, masked_number, created_at)'
+                    " VALUES ('acc', 'bancolombia', 'Ahorros',"
+                    " 'checking', 'COP', '****1234', 'now')"
                 )
                 con.execute(
                     'INSERT INTO transactions (id, account_id, amount, currency, merchant, date,'

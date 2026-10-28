@@ -72,7 +72,8 @@ def _save(con: sqlite3.Connection, **kwargs: str) -> None:
         for key, value in kwargs.items():
             con.execute(
                 'INSERT INTO user_settings (key, value, updated_at) VALUES (?, ?, ?)'
-                ' ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at',
+                ' ON CONFLICT(key) DO UPDATE SET'
+                ' value=excluded.value, updated_at=excluded.updated_at',
                 (key, value, now),
             )
 
@@ -187,7 +188,8 @@ def _q_banks() -> str:
 
 def _q_types(bank_name: str) -> str:
     lines = [
-        f'What types of accounts do you have with {bank_name}? Reply with numbers, comma-separated.\n'
+        f'What types of accounts do you have with {bank_name}? '
+        'Reply with numbers, comma-separated.\n'
     ]
     for i, (_, label) in enumerate(ACCT_TYPES, 1):
         lines.append(f'{i}. {label}')
@@ -235,7 +237,6 @@ def _start_next_account(con: sqlite3.Connection, queue: list[dict]) -> None:
 def _finalize(con: sqlite3.Connection, s: dict) -> None:
     _mark_complete(con)
     email_user = s.get('imap_username') or s.get('wizard_imap_username', '')
-    senders = s.get('bank_sender_emails') or s.get('wizard_bank_senders', '')
     n_accts = con.execute('SELECT count(*) FROM accounts').fetchone()[0]
     reached_sms = s.get('wizard_step', '') not in ('sms_choice', 'welcome', 'welcome_choice')
 
@@ -332,7 +333,8 @@ def main() -> None:
         if not ans:
             _out(
                 'email_provider',
-                'Which email provider?\n\n1. Gmail\n2. Yahoo Mail\n3. Outlook / Microsoft 365\n4. Other',
+                'Which email provider?\n\n'
+                '1. Gmail\n2. Yahoo Mail\n3. Outlook / Microsoft 365\n4. Other',
             )
             return
         low = ans.lower()
@@ -364,7 +366,8 @@ def main() -> None:
             _out(
                 'email_outlook_redirect',
                 (tmpl + '\n\n' if tmpl else '')
-                + 'Once the forwarding rule is active, which Gmail or Yahoo address will receive the forwarded emails?',
+                + 'Once the forwarding rule is active, which Gmail or Yahoo'
+                + ' address will receive the forwarded emails?',
             )
         else:
             _save(con, wizard_step='email_other_host', wizard_email_provider='other')
@@ -458,12 +461,14 @@ def main() -> None:
             elif err == 'auth':
                 _out(
                     'email_password',
-                    f'❌ Login failed ({retries}/3). Double-check your App Password.\n\nPaste your App Password:',
+                    f'❌ Login failed ({retries}/3). Double-check your App Password.\n\n'
+                    'Paste your App Password:',
                 )
             else:
                 _out(
                     'email_password',
-                    f'❌ Could not reach {host} ({retries}/3). Check the hostname.\n\nPaste your App Password:',
+                    f'❌ Could not reach {host} ({retries}/3). Check the hostname.\n\n'
+                    'Paste your App Password:',
                 )
         return
 
@@ -562,7 +567,8 @@ def main() -> None:
         if not ans:
             _out(
                 'account_last4',
-                f'What are the last 4 digits of the account number shown in {bank_name} notifications?\n'
+                f'What are the last 4 digits of the account number'
+                f' shown in {bank_name} notifications?\n'
                 '(or "skip" to leave blank)',
             )
             return

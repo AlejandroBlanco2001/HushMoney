@@ -7,6 +7,7 @@ import logging
 import os
 import sqlite3
 import sys
+from collections.abc import AsyncIterator
 
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -212,7 +213,7 @@ async def _keepalive_loop() -> None:
 
 
 @contextlib.asynccontextmanager
-async def lifespan(_app: Starlette):
+async def lifespan(_app: Starlette) -> AsyncIterator[None]:
     task = asyncio.create_task(_keepalive_loop())
     try:
         yield
@@ -283,7 +284,7 @@ async def gateway(request: Request) -> JSONResponse:
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    stdout, stderr = await proc.communicate()
+    _, stderr = await proc.communicate()
 
     if proc.returncode != 0:
         log.error('hermes send failed: %s', stderr.decode())

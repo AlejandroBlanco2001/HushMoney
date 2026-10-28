@@ -152,7 +152,9 @@ CASES: list[Case] = [
             ('2026-04-09', 35000),
         ],
         expect_recurring=True,
-        description='Multiple charges per month — only first used per month, 4 months match → recurring',
+        description=(
+            'Multiple charges per month — only first used per month, 4 months match → recurring'
+        ),
     ),
     Case(
         name='transfers_excluded',
@@ -186,7 +188,8 @@ def _seed_transfers(db_path: str) -> None:
                 'INSERT INTO transactions'
                 ' (id, account_id, amount, currency, merchant, date,'
                 '  transaction_type, channel, category, message_hash, created_at, updated_at)'
-                " VALUES (?, 'acc-1', 80000, 'COP', 'NEQUI-A', ?, 'transfer_in', 'sms', 'transfers', ?, ?, ?)",
+                " VALUES (?, 'acc-1', 80000, 'COP', 'NEQUI-A', ?,"
+                " 'transfer_in', 'sms', 'transfers', ?, ?, ?)",
                 (f'tx-nequi-{i}', date, f'hash-nequi-{i}', now, now),
             )
     con.close()

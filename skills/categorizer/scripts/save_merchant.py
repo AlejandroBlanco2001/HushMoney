@@ -38,7 +38,9 @@ def main() -> None:
     with con:
         con.execute(
             """
-            INSERT INTO merchants (name, category, needs_clarification, last_category, is_recurring, created_at, updated_at)
+            INSERT INTO merchants
+                (name, category, needs_clarification, last_category,
+                 is_recurring, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(name) DO UPDATE SET
                 category            = excluded.category,

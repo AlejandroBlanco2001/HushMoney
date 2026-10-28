@@ -33,7 +33,8 @@ DEFAULTS: dict[str, str] = {
 def _ensure_schema(con: sqlite3.Connection) -> None:
     schema_path = os.path.abspath(_SCHEMA_PATH)
     if os.path.isfile(schema_path):
-        con.executescript(open(schema_path).read())
+        with open(schema_path) as f:
+            con.executescript(f.read())
 
 
 def main() -> None:

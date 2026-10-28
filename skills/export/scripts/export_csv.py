@@ -25,7 +25,7 @@ from pathlib import Path
 
 
 DB_PATH = os.environ.get('HUSHMONEY_DB', os.path.expanduser('~/.hermes/hushmoney.db'))
-DEFAULT_OUT_DIR = '/tmp/hushmoney_exports'
+DEFAULT_OUT_DIR = '/tmp/hushmoney_exports'  # noqa: S108  # default export dir, overridable via --out-dir
 FILE_PREFIX = 'hushmoney_'
 COLUMNS = [
     'date',

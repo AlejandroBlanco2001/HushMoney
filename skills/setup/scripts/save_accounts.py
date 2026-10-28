@@ -34,7 +34,8 @@ VALID_BANKS = {'bancolombia', 'davivienda', 'nequi', 'bbva', 'unknown'}
 
 def _ensure_schema(con: sqlite3.Connection) -> None:
     if os.path.isfile(SCHEMA_PATH):
-        con.executescript(open(SCHEMA_PATH).read())
+        with open(SCHEMA_PATH) as f:
+            con.executescript(f.read())
 
 
 def main() -> None:
@@ -80,7 +81,8 @@ def main() -> None:
             now = datetime.now(UTC).isoformat()
             with con:
                 con.execute(
-                    'INSERT INTO accounts (id, bank, alias, type, currency, masked_number, created_at)'
+                    'INSERT INTO accounts'
+                    ' (id, bank, alias, type, currency, masked_number, created_at)'
                     ' VALUES (?, ?, ?, ?, ?, ?, ?)',
                     (
                         account_id,

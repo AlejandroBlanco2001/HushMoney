@@ -126,7 +126,7 @@ def call_model(api_key: str, model_id: str, fixture: Fixture) -> dict[str, Any]:
         ],
         max_tokens=64,
     )
-    result = api.extract_json(resp['content'], valid_values=CATEGORIES + ['needs_clarification'])
+    result = api.extract_json(resp['content'], valid_values=[*CATEGORIES, 'needs_clarification'])
     cat = str(result.get('category') or result.get('_scanned') or 'other').lower().strip()
     return {
         'category': cat,
@@ -221,12 +221,14 @@ def score(cases: list[dict] | None = None) -> None:
 
     print(f'\n{"=" * 72}')
     print(
-        f'CATEGORIZER EVAL  ({total} fixtures: {len(unambiguous)} unambiguous, {len(ambiguous)} ambiguous)'
+        f'CATEGORIZER EVAL  ({total} fixtures: '
+        f'{len(unambiguous)} unambiguous, {len(ambiguous)} ambiguous)'
     )
     print(f'{"=" * 72}\n')
 
     print(
-        f'  {"Model":<28} {"Overall":>7}  {"Unambiguous":>11}  {"Clarification":>13}  {"$/1K":>8}  {"Pass":>5}'
+        f'  {"Model":<28} {"Overall":>7}  {"Unambiguous":>11}  '
+        f'{"Clarification":>13}  {"$/1K":>8}  {"Pass":>5}'
     )
     print(f'  {"-" * 76}')
 
@@ -239,7 +241,7 @@ def score(cases: list[dict] | None = None) -> None:
             print(f'  {model["label"]:<28}  no data')
             continue
 
-        def acc(subset):
+        def acc(subset, key=key):
             if not subset:
                 return float('nan')
             hits = [c for c in subset if key in c['models'] and c['models'][key].get('correct')]

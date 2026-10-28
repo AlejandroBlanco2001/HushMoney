@@ -130,7 +130,8 @@ def main(verbose: bool = False) -> None:
 
         con = sqlite3.connect(db_path)
         n_accounts = con.execute(
-            "SELECT COUNT(*) FROM accounts WHERE bank='bancolombia' AND type='checking' AND currency='COP'"
+            'SELECT COUNT(*) FROM accounts'
+            " WHERE bank='bancolombia' AND type='checking' AND currency='COP'"
         ).fetchone()[0]
         n_tx = con.execute('SELECT COUNT(*) FROM transactions').fetchone()[0]
         con.close()

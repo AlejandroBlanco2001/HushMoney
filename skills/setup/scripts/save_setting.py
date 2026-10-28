@@ -27,7 +27,8 @@ def main() -> None:
     with con:
         con.execute(
             'INSERT INTO user_settings (key, value, updated_at) VALUES (?, ?, ?)'
-            ' ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at',
+            ' ON CONFLICT(key) DO UPDATE SET'
+            ' value = excluded.value, updated_at = excluded.updated_at',
             (key, value, now),
         )
     con.close()
