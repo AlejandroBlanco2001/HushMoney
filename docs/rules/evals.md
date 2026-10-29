@@ -50,9 +50,9 @@ For skills that call other skills or tools in a specific order, assert the seque
 
 ```python
 # Example: setup skill must call playwright before confirming
-trace = run_skill("setup", payload=...)
-assert trace.calls[0].tool == "playwright_navigate"
-assert trace.calls[-1].tool == "telegram_send"
+trace = run_skill('setup', payload=...)
+assert trace.calls[0].tool == 'playwright_navigate'
+assert trace.calls[-1].tool == 'telegram_send'
 ```
 
 ## What Explicitly Does NOT Need Coverage

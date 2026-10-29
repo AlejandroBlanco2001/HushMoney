@@ -16,14 +16,20 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           version: "latest"
+          enable-cache: true
+          cache-dependency-glob: "forwarder/uv.lock"
 
-      # Lint and format-check the whole repo. The forwarder/ package uses its
-      # own nearest config; everything else uses the root ruff.toml.
+      - name: Install dependencies
+        run: uv sync --project forwarder --frozen
+
+      # Use the ruff version pinned in forwarder/uv.lock (not uvx-latest) so CI
+      # matches local `uv run` and never drifts on a new ruff release. The
+      # forwarder/ package uses its own config; the rest uses the root ruff.toml.
       - name: Ruff check
-        run: uvx ruff check .
+        run: uv run --project forwarder ruff check .
 
       - name: Ruff format check
-        run: uvx ruff format --check .
+        run: uv run --project forwarder ruff format --check .
 
   typecheck:
     name: Type check (Pyright, strict)
