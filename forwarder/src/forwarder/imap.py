@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import email
 import email.header
+import email.message
 import imaplib
 import logging
 from dataclasses import dataclass
@@ -39,7 +40,9 @@ def _fetch_from_sender(conn: imaplib.IMAP4_SSL, sender: str) -> list[Email]:
 
     results: list[Email] = []
     for seq in seq_nums:
-        _, raw = conn.fetch(seq, '(RFC822)')
+        # imaplib accepts bytes at runtime but its stubs require str.
+        seq_id = seq.decode()
+        _, raw = conn.fetch(seq_id, '(RFC822)')
         if not raw or raw[0] is None:
             continue
 
@@ -63,7 +66,7 @@ def _fetch_from_sender(conn: imaplib.IMAP4_SSL, sender: str) -> list[Email]:
 
         # Mark seen before returning — no retry queue by design; dropped messages are
         # preferable to re-processing and double-counting a transaction.
-        conn.store(seq, '+FLAGS', '\\Seen')
+        conn.store(seq_id, '+FLAGS', '\\Seen')
 
     return results
 
@@ -110,7 +113,7 @@ def parse_email_bytes(raw: bytes) -> Email | None:
 
 
 def _decode_header(value: str) -> str:
-    parts = []
+    parts: list[str] = []
     for fragment, charset in email.header.decode_header(value):
         if isinstance(fragment, bytes):
             parts.append(fragment.decode(charset or 'utf-8', errors='replace'))

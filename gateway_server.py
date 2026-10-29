@@ -7,7 +7,8 @@ import logging
 import os
 import sqlite3
 import sys
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
+from typing import Any
 
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -40,7 +41,7 @@ _NEBIUS_MODEL = os.getenv('HERMES_MODEL', 'nvidia/nemotron-3-super-120b-a12b')
 _KEEPALIVE_INTERVAL = int(os.getenv('NEBIUS_KEEPALIVE_INTERVAL', '240'))
 
 
-async def _run_script(*args: str) -> dict | None:
+async def _run_script(*args: str) -> dict[str, Any] | None:
     proc = await asyncio.create_subprocess_exec(
         *args,
         stdout=asyncio.subprocess.PIPE,
@@ -48,9 +49,8 @@ async def _run_script(*args: str) -> dict | None:
     )
     stdout, stderr = await proc.communicate()
     if proc.returncode != 0:
-        log.warning(
-            'script %s failed: %s', args[1] if len(args) > 1 else args[0], stderr.decode().strip()
-        )
+        script = args[1] if len(args) > 1 else (args[0] if args else '?')
+        log.warning('script %s failed: %s', script, stderr.decode().strip())
         return None
     try:
         return json.loads(stdout.decode())
@@ -59,7 +59,7 @@ async def _run_script(*args: str) -> dict | None:
 
 
 async def _store_and_categorize(
-    data: dict,
+    data: dict[str, Any],
 ) -> tuple[str | None, str | None, bool, str | None, bool]:
     """Store transaction and attempt auto-categorization.
 
@@ -213,7 +213,7 @@ async def _keepalive_loop() -> None:
 
 
 @contextlib.asynccontextmanager
-async def lifespan(_app: Starlette) -> AsyncIterator[None]:
+async def lifespan(_app: Starlette) -> AsyncGenerator[None]:
     task = asyncio.create_task(_keepalive_loop())
     try:
         yield

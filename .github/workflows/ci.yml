@@ -25,6 +25,30 @@ jobs:
       - name: Ruff format check
         run: uvx ruff format --check .
 
+  typecheck:
+    name: Type check (Pyright, strict)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+          cache-dependency-glob: "forwarder/uv.lock"
+
+      - name: Install dependencies
+        run: uv sync --project forwarder --frozen
+
+      # forwarder/ uses its own [tool.pyright] (src); the repo root uses
+      # pyrightconfig.json (gateway_server.py), both sharing forwarder's venv.
+      - name: Pyright (forwarder/src)
+        run: cd forwarder && uv run pyright
+
+      - name: Pyright (gateway_server.py)
+        run: uv run --project forwarder pyright
+
   test:
     name: Tests (Python 3.12)
     runs-on: ubuntu-latest
@@ -59,6 +83,7 @@ jobs:
       # need NEBIUS_API_KEY and run in the manual Evals workflow instead.
       - name: Run offline evals
         run: |
+          set -euo pipefail
           find evals -mindepth 2 -maxdepth 2 -name "*.py" \
             ! -path "*/lib/*" \
             ! -path "*/model_selection/*" \
@@ -66,6 +91,6 @@ jobs:
             ! -name "judge.py" \
             | sort | while read -r script; do
               echo "::group::$script"
-              python "$script"
+              python "$script" || exit 1
               echo "::endgroup::"
             done

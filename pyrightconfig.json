@@ -1,0 +1,7 @@
+{
+  "include": ["gateway_server.py"],
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "strict",
+  "venvPath": "forwarder",
+  "venv": ".venv"
+}
