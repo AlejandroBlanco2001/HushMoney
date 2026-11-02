@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HushMoney — zero-input expense tracking that keeps your data yours</title>
+<meta name="description" content="An open-source personal finance agent. It reads the notifications your bank already sends, redacts every sensitive detail before the AI sees it, and tracks your spending automatically. Self-hosted. Built on Hermes Agent + NVIDIA Nemotron on Nebius.">
+
+<meta property="og:title" content="HushMoney — your bank talks, HushMoney listens">
+<meta property="og:description" content="Open-source, zero-input expense tracking. Your bank's notifications in, PII redacted before the AI ever sees it, spending tracked automatically. Self-hosted.">
+<meta property="og:type" content="website">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --paper:#f3ead9; --paper-2:#f8f2e7; --card:#fffdf9;
+    --ink:#241f1c; --ink-soft:#6a5f55; --ink-faint:#9a8c7c;
+    --terra:#c65d3b; --terra-deep:#9a4a2f;
+    --olive:#6f9158; --blue:#5b7a9e;
+    --line:rgba(120,90,50,.14);
+    --dark:#171310; --dark-2:#1f1a15;
+    --nv:#76b900;
+    --maxw:1080px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    color:var(--ink); background:var(--paper);
+    -webkit-font-smoothing:antialiased; line-height:1.5;
+  }
+  a{color:inherit;text-decoration:none;}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px;}
+  .serif{font-family:'Fraunces',Georgia,serif;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+
+  /* ---------- NAV ---------- */
+  nav{position:sticky;top:0;z-index:50;background:rgba(243,234,217,.82);
+      backdrop-filter:blur(10px);border-bottom:1px solid var(--line);}
+  .nav-in{max-width:var(--maxw);margin:0 auto;padding:16px 28px;display:flex;align-items:center;gap:14px;}
+  .logo{display:flex;align-items:center;gap:11px;font-family:'Fraunces',serif;font-weight:600;font-size:22px;}
+  .logo .mk{width:34px;height:34px;border-radius:10px;background:var(--terra);display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(198,93,59,.3);}
+  .logo .mk svg{width:19px;height:19px;}
+  .logo b{font-weight:600;} .logo i{font-style:italic;color:var(--terra);}
+  .nav-links{margin-left:auto;display:flex;align-items:center;gap:26px;font-size:15px;font-weight:500;color:var(--ink-soft);}
+  .nav-links a:hover{color:var(--ink);}
+  .btn{display:inline-flex;align-items:center;gap:9px;font-weight:600;font-size:15px;
+       padding:11px 18px;border-radius:11px;transition:transform .12s ease, box-shadow .12s ease;}
+  .btn svg{width:18px;height:18px;}
+  .btn-primary{background:var(--ink);color:var(--paper-2);box-shadow:0 8px 20px rgba(36,31,28,.18);}
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 12px 26px rgba(36,31,28,.26);}
+  .btn-ghost{border:1.5px solid var(--line);color:var(--ink);background:var(--card);}
+  .btn-ghost:hover{border-color:var(--ink-faint);}
+  .nav-links .btn{padding:9px 15px;}
+  @media(max-width:700px){.nav-links a:not(.btn){display:none;}}
+
+  /* ---------- HERO ---------- */
+  header.hero{position:relative;overflow:hidden;
+    background:
+      radial-gradient(760px 520px at 100% -8%, rgba(198,93,59,.13), transparent 60%),
+      radial-gradient(680px 480px at -8% 112%, rgba(111,145,88,.12), transparent 62%),
+      linear-gradient(175deg,var(--paper-2) 0%, var(--paper) 100%);}
+  .hero-grain{position:absolute;inset:0;opacity:.5;mix-blend-mode:multiply;pointer-events:none;
+    background-image:radial-gradient(rgba(120,100,70,.05) 1px,transparent 1px);background-size:4px 4px;}
+  .hero-in{position:relative;display:grid;grid-template-columns:1.05fr .95fr;gap:52px;align-items:center;
+           padding:84px 0 92px;}
+  .badge{display:inline-flex;align-items:center;gap:9px;font-size:13px;font-weight:700;letter-spacing:.4px;
+    text-transform:uppercase;color:var(--terra-deep);border:1.5px solid rgba(198,93,59,.35);
+    padding:8px 14px;border-radius:999px;background:rgba(198,93,59,.07);}
+  .badge .dot{width:7px;height:7px;border-radius:50%;background:var(--nv);box-shadow:0 0 0 3px rgba(118,185,0,.18);}
+  h1{font-family:'Fraunces',serif;font-weight:600;font-size:60px;line-height:1.02;letter-spacing:-1.8px;margin-top:26px;}
+  h1 i{font-style:italic;color:var(--terra);font-weight:500;}
+  .lede{font-size:20px;line-height:1.55;color:var(--ink-soft);margin-top:24px;max-width:520px;}
+  .lede b{color:var(--ink);font-weight:700;}
+  .cta-row{display:flex;flex-wrap:wrap;gap:13px;margin-top:34px;}
+  .btn-lg{padding:15px 24px;font-size:16px;border-radius:13px;}
+  .stars{display:inline-flex;align-items:center;gap:7px;font-size:14px;color:var(--ink-faint);margin-top:18px;font-weight:500;}
+  .stars svg{width:15px;height:15px;}
+
+  /* hero visual: the two cards */
+  .hero-vis{position:relative;height:420px;}
+  .hcard{position:absolute;border-radius:20px;background:var(--card);border:1px solid var(--line);
+    box-shadow:0 28px 56px rgba(90,60,30,.15);padding:24px 26px;}
+  .hcard .lbl{font-size:12px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;margin-bottom:12px;}
+  .card-raw{top:6px;left:0;right:46px;transform:rotate(-2.2deg);}
+  .card-raw .lbl{color:var(--terra-deep);}
+  .stamp{position:absolute;top:20px;right:22px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;
+    letter-spacing:2px;color:var(--terra-deep);border:2px solid var(--terra-deep);border-radius:6px;padding:3px 9px;opacity:.5;transform:rotate(6deg);}
+  .sms{font-family:'JetBrains Mono',monospace;font-size:16px;line-height:1.95;color:#3b332c;}
+  .bar{display:inline-block;background:var(--ink);border-radius:4px;height:20px;vertical-align:middle;position:relative;}
+  .bar::after{content:'REDACTED';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:7.5px;letter-spacing:1px;color:var(--paper-2);font-weight:700;opacity:.65;}
+  .bar.w1{width:92px;}.bar.w2{width:66px;}.bar.w3{width:112px;}
+  .amt{color:var(--terra-deep);font-weight:700;}
+  .card-tg{bottom:2px;right:0;left:70px;transform:rotate(1.8deg);}
+  .card-tg .lbl{color:var(--blue);}
+  .tgrow{display:flex;align-items:center;gap:14px;}
+  .tgrow .em{font-size:32px;}
+  .tg-main{font-family:'Fraunces',serif;font-weight:600;font-size:23px;color:var(--ink);letter-spacing:-.4px;}
+  .tg-cat{font-size:14px;color:var(--blue);font-weight:700;margin-top:2px;}
+  .chk{margin-left:auto;width:34px;height:34px;border-radius:50%;background:var(--olive);display:flex;align-items:center;justify-content:center;box-shadow:0 6px 15px rgba(111,145,88,.4);}
+  .chk svg{width:18px;height:18px;}
+
+  @media(max-width:860px){
+    .hero-in{grid-template-columns:1fr;gap:40px;padding:60px 0 70px;}
+    h1{font-size:46px;}
+    .hero-vis{height:380px;max-width:460px;}
+  }
+
+  /* ---------- SECTION SHELL ---------- */
+  section{padding:88px 0;}
+  .eyebrow{font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--terra);}
+  .h2{font-family:'Fraunces',serif;font-weight:600;font-size:40px;letter-spacing:-1px;line-height:1.1;margin-top:12px;}
+  .sec-lede{font-size:18px;color:var(--ink-soft);margin-top:16px;max-width:620px;line-height:1.55;}
+
+  /* how it works */
+  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:48px;}
+  .step{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:26px 22px;position:relative;}
+  .step .n{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--terra);letter-spacing:1px;}
+  .step .ic{width:44px;height:44px;border-radius:12px;background:var(--paper);display:flex;align-items:center;justify-content:center;margin:14px 0 16px;border:1px solid var(--line);}
+  .step .ic svg{width:23px;height:23px;}
+  .step h3{font-family:'Fraunces',serif;font-weight:600;font-size:20px;letter-spacing:-.3px;}
+  .step p{font-size:14.5px;color:var(--ink-soft);margin-top:8px;line-height:1.5;}
+  .step.key{border-color:rgba(198,93,59,.35);background:linear-gradient(170deg,#fff7f1,#fffdf9);}
+  @media(max-width:860px){.steps{grid-template-columns:1fr 1fr;}}
+  @media(max-width:520px){.steps{grid-template-columns:1fr;}}
+
+  /* ---------- DARK BAND ---------- */
+  .dark{background:
+      radial-gradient(700px 480px at 92% 0%, rgba(118,185,0,.12), transparent 58%),
+      radial-gradient(600px 460px at 0% 100%, rgba(91,122,158,.14), transparent 60%),
+      var(--dark);
+    color:#efe8dd;}
+  .dark .eyebrow{color:var(--nv);}
+  .dark .h2{color:#fbf6ee;}
+  .dark .sec-lede{color:#b9ae9f;}
+  .dark-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:52px;align-items:start;margin-top:46px;}
+  .priv{list-style:none;display:flex;flex-direction:column;gap:18px;}
+  .priv li{display:flex;gap:14px;align-items:flex-start;}
+  .priv .tick{flex:none;width:26px;height:26px;border-radius:8px;background:rgba(118,185,0,.16);display:flex;align-items:center;justify-content:center;margin-top:1px;}
+  .priv .tick svg{width:15px;height:15px;}
+  .priv b{color:#fbf6ee;font-weight:700;font-size:16px;}
+  .priv span{display:block;color:#a99e8f;font-size:14.5px;margin-top:3px;line-height:1.5;}
+  .stackcard{background:var(--dark-2);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:26px 26px;}
+  .stackcard h4{font-size:13px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:#8a8070;margin-bottom:18px;}
+  .srow{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:15px;}
+  .srow:last-child{border-bottom:none;}
+  .srow span{color:#9a8f7f;}
+  .srow b{color:#efe8dd;font-weight:600;font-family:'JetBrains Mono',monospace;font-size:13.5px;}
+  .srow b.g{color:var(--nv);}
+  @media(max-width:860px){.dark-grid{grid-template-columns:1fr;gap:36px;}}
+
+  /* ---------- FINAL CTA ---------- */
+  .final{text-align:center;background:linear-gradient(175deg,var(--paper) 0%,var(--paper-2) 100%);}
+  .final .h2{font-size:44px;}
+  .final .sec-lede{margin:16px auto 0;}
+  .final .cta-row{justify-content:center;margin-top:34px;}
+  .oss{display:inline-flex;align-items:center;gap:10px;margin-top:26px;font-size:14px;color:var(--ink-faint);font-weight:500;}
+  .oss .pill{border:1px solid var(--line);border-radius:999px;padding:5px 12px;background:var(--card);}
+
+  footer{border-top:1px solid var(--line);padding:34px 0;}
+  .foot-in{max-width:var(--maxw);margin:0 auto;padding:0 28px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-size:14px;color:var(--ink-faint);}
+  .foot-in .logo{font-size:18px;}
+  .foot-in .logo .mk{width:28px;height:28px;border-radius:8px;}
+  .foot-in .r{margin-left:auto;display:flex;gap:22px;}
+  .foot-in .r a:hover{color:var(--ink);}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-in">
+    <a class="logo" href="#top">
+      <span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="#fffdf9" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L4 21l1.1-4.1A8.4 8.4 0 1 1 21 11.5z"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg></span>
+      <span><b>Hush</b><i>Money</i></span>
+    </a>
+    <div class="nav-links">
+      <a href="#how">How it works</a>
+      <a href="#privacy">Privacy</a>
+      <a href="https://hush-4096d3cd.mintlify.site/quickstart">Docs</a>
+      <a class="btn btn-primary" href="https://github.com/AlejandroBlanco2001/Untyped">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.57.1.78-.25.78-.55v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.5 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.82 1.19 3.08 0 4.43-2.69 5.4-5.25 5.69.41.36.78 1.06.78 2.14v3.17c0 .3.2.66.79.55A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z"/></svg>
+        GitHub
+      </a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="hero-grain"></div>
+  <div class="wrap hero-in">
+    <div>
+      <span class="badge"><span class="dot"></span>Personal AI Track · NVIDIA × Nebius Hackathon</span>
+      <h1>Your bank talks.<br>HushMoney <i>listens.</i></h1>
+      <p class="lede">An open-source expense tracker that reads the notifications your bank already
+        sends — SMS, push, email — and logs every transaction on its own.
+        <b>Account numbers, OTPs and names are redacted before the AI ever sees them.</b></p>
+      <div class="cta-row">
+        <a class="btn btn-primary btn-lg" href="https://github.com/AlejandroBlanco2001/Untyped">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.57.1.78-.25.78-.55v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.5 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.82 1.19 3.08 0 4.43-2.69 5.4-5.25 5.69.41.36.78 1.06.78 2.14v3.17c0 .3.2.66.79.55A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z"/></svg>
+          Star on GitHub
+        </a>
+        <a class="btn btn-ghost btn-lg" href="https://hush-4096d3cd.mintlify.site/quickstart">Read the docs</a>
+      </div>
+      <div class="stars">
+        <svg viewBox="0 0 24 24" fill="var(--terra)"><path d="M12 2l3 6.5 7 .6-5.3 4.6 1.6 6.8L12 17.3 5.7 20.5l1.6-6.8L2 9.1l7-.6z"/></svg>
+        MIT licensed · self-hosted · your data never leaves your machine
+      </div>
+    </div>
+
+    <div class="hero-vis">
+      <div class="hcard card-raw">
+        <div class="lbl">Bank SMS · as received</div>
+        <div class="stamp">PRIVATE</div>
+        <div class="sms">
+          Compra <span class="amt">$47.350</span> en RAPPI.<br>
+          Cuenta <span class="bar w1"></span><br>
+          Clave <span class="bar w2"></span> &nbsp;Saldo <span class="bar w3"></span>
+        </div>
+      </div>
+      <div class="hcard card-tg">
+        <div class="lbl">Telegram · what you see</div>
+        <div class="tgrow">
+          <span class="em">🍔</span>
+          <div>
+            <div class="tg-main">$47,350 · RAPPI</div>
+            <div class="tg-cat">Food delivery · logged</div>
+          </div>
+          <span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="#fffdf9" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="wrap">
+    <span class="eyebrow">How it works</span>
+    <h2 class="h2">Four steps. Zero manual entry.</h2>
+    <p class="sec-lede">Your bank already sends a notification for every transaction. HushMoney
+      turns that stream into a clean, categorized ledger — without ever touching your account.</p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="n">01</div>
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="var(--terra)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H5.2L4 17.5z"/><path d="M8 9h8M8 12h5"/></svg></div>
+        <h3>Notification arrives</h3>
+        <p>A bank SMS, push, or email lands — picked up over IMAP or a Telegram listener.</p>
+      </div>
+      <div class="step key">
+        <div class="n">02</div>
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="var(--terra)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
+        <h3>Redaction firewall</h3>
+        <p>OTPs, account numbers and names are stripped. Only <span class="mono">amount, merchant, date, type</span> continue.</p>
+      </div>
+      <div class="step">
+        <div class="n">03</div>
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="var(--terra)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg></div>
+        <h3>Agent reasons</h3>
+        <p>Hermes categorizes the transaction, stores it, and spots recurring charges.</p>
+      </div>
+      <div class="step">
+        <div class="n">04</div>
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="var(--terra)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4L3 11l6 2 2 6z"/><path d="M21 4L9 13"/></svg></div>
+        <h3>You get a summary</h3>
+        <p>Daily, weekly and monthly rollups delivered to your own Telegram bot.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DARK: PRIVACY + STACK -->
+<section class="dark" id="privacy">
+  <div class="wrap">
+    <span class="eyebrow">The privacy boundary</span>
+    <h2 class="h2">The AI never sees your raw bank data.</h2>
+    <p class="sec-lede">Redaction isn't a setting — it's the shape of the system. Everything
+      downstream of the forwarder is untrusted by design.</p>
+
+    <div class="dark-grid">
+      <ul class="priv">
+        <li>
+          <span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="var(--nv)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
+          <div><b>Stripped at the edge</b><span>OTPs, account numbers and recipient names are removed in the forwarder, before anything reaches the model.</span></div>
+        </li>
+        <li>
+          <span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="var(--nv)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
+          <div><b>Learns from redacted text only</b><span>When a new bank format appears, the model infers structure from already-redacted messages — word order and delimiters, never real values.</span></div>
+        </li>
+        <li>
+          <span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="var(--nv)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
+          <div><b>Self-hosted, single-user</b><span>You own the bot token, the database, and the box it runs on. The SQLite store never leaves your machine.</span></div>
+        </li>
+        <li>
+          <span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="var(--nv)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
+          <div><b>Sandboxed agent</b><span>Hermes runs inside an NVIDIA OpenShell policy that limits which files and endpoints it can reach.</span></div>
+        </li>
+      </ul>
+
+      <div class="stackcard">
+        <h4>The stack</h4>
+        <div class="srow"><span>Agent runtime</span><b>Hermes Agent</b></div>
+        <div class="srow"><span>Model</span><b class="g">NVIDIA Nemotron</b></div>
+        <div class="srow"><span>Inference</span><b>Nebius Token Factory</b></div>
+        <div class="srow"><span>Sandbox</span><b>NVIDIA OpenShell</b></div>
+        <div class="srow"><span>Ingestion</span><b>IMAP · Pyrogram</b></div>
+        <div class="srow"><span>Storage</span><b>SQLite</b></div>
+        <div class="srow"><span>Interface</span><b>Telegram</b></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="final">
+  <div class="wrap">
+    <span class="eyebrow">Open source</span>
+    <h2 class="h2">Run it yourself.</h2>
+    <p class="sec-lede">HushMoney is MIT-licensed and still early. Clone it, self-host it, open an issue,
+      or send a PR — contributions are welcome.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary btn-lg" href="https://github.com/AlejandroBlanco2001/Untyped">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.57.1.78-.25.78-.55v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.5 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.82 1.19 3.08 0 4.43-2.69 5.4-5.25 5.69.41.36.78 1.06.78 2.14v3.17c0 .3.2.66.79.55A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z"/></svg>
+        View on GitHub
+      </a>
+      <a class="btn btn-ghost btn-lg" href="https://hush-4096d3cd.mintlify.site/quickstart">Setup guide</a>
+    </div>
+    <div class="oss">
+      <span class="pill">MIT License</span>
+      <span class="pill">Python 3.12</span>
+      <span class="pill">Self-hosted</span>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="foot-in">
+    <a class="logo" href="#top">
+      <span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="#fffdf9" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L4 21l1.1-4.1A8.4 8.4 0 1 1 21 11.5z"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg></span>
+      <span><b>Hush</b><i style="font-style:italic;color:var(--terra)">Money</i></span>
+    </a>
+    <span>Built for the NVIDIA × Nebius Hackathon · Personal AI Track</span>
+    <div class="r">
+      <a href="https://github.com/AlejandroBlanco2001/Untyped">GitHub</a>
+      <a href="https://hush-4096d3cd.mintlify.site/quickstart">Docs</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
