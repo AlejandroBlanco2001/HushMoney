@@ -48,35 +48,47 @@ def chat_completion(
     model_id: str,
     messages: list[dict[str, str]],
     *,
+    base_url: str | None = None,
     max_tokens: int = 256,
     temperature: float = 0,
+    timeout: float = 30,
+    response_format: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Call the Nebius chat completions endpoint.
+    """Call an OpenAI-compatible chat completions endpoint.
+
+    Defaults to Nebius (``API_BASE``). Pass ``base_url`` to target another
+    OpenAI-compatible server, e.g. a local Ollama at http://localhost:11434/v1.
+    An empty ``api_key`` omits the Authorization header (Ollama needs no key).
+    ``response_format`` (e.g. {"type": "json_object"}) constrains output to JSON —
+    honored by both Nebius and Ollama's OpenAI-compatible endpoint.
 
     Returns:
         {"content": str, "input_tokens": int, "output_tokens": int, "latency_ms": int}
     """
-    body = json.dumps(
-        {
-            'model': model_id,
-            'messages': messages,
-            'temperature': temperature,
-            'max_tokens': max_tokens,
-        }
-    ).encode()
+    base = (base_url or API_BASE).rstrip('/')
+    payload: dict[str, Any] = {
+        'model': model_id,
+        'messages': messages,
+        'temperature': temperature,
+        'max_tokens': max_tokens,
+    }
+    if response_format is not None:
+        payload['response_format'] = response_format
+    body = json.dumps(payload).encode()
+
+    headers = {'Content-Type': 'application/json'}
+    if api_key:
+        headers['Authorization'] = f'Bearer {api_key}'
 
     req = urllib.request.Request(
-        f'{API_BASE}/chat/completions',
+        f'{base}/chat/completions',
         data=body,
-        headers={
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {api_key}',
-        },
+        headers=headers,
         method='POST',
     )
 
     t0 = time.perf_counter()
-    with urllib.request.urlopen(req, timeout=30, context=ssl_context()) as resp:
+    with urllib.request.urlopen(req, timeout=timeout, context=ssl_context()) as resp:
         latency_ms = round((time.perf_counter() - t0) * 1000)
         data = json.loads(resp.read())
 

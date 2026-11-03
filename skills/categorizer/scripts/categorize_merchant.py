@@ -2,7 +2,10 @@
 Categorize a merchant using the LLM.
 
 Reads categories from SQLite (falls back to hardcoded list).
-Uses OPENAI_BASE_URL + HERMES_MODEL + NEBIUS_API_KEY env vars.
+Resolves the model from CATEGORIZER_BASE_URL / CATEGORIZER_MODEL when set (lets the
+categorizer target a local model while the agent stays on the shared OPENAI_BASE_URL /
+HERMES_MODEL), falling back to those shared vars. NEBIUS_API_KEY / OPENAI_API_KEY auth
+a cloud endpoint; a local endpoint (localhost/ollama) needs no key.
 
 Usage: python3 categorize_merchant.py --merchant "MCD" --payload '{"amount": 15.0, ...}'
 Output: {"category": "food", "needs_clarification": false}
@@ -22,11 +25,22 @@ import urllib.request
 
 
 DB_PATH = os.environ.get('HUSHMONEY_DB', os.path.expanduser('~/.hermes/hushmoney.db'))
-API_BASE = os.environ.get('OPENAI_BASE_URL', 'https://api.studio.nebius.ai/v1').rstrip('/')
-MODEL = os.environ.get('HERMES_MODEL', 'nvidia/nemotron-3-super-120b-a12b')
+API_BASE = (
+    os.environ.get('CATEGORIZER_BASE_URL')
+    or os.environ.get('OPENAI_BASE_URL', 'https://api.studio.nebius.ai/v1')
+).rstrip('/')
+MODEL = os.environ.get('CATEGORIZER_MODEL') or os.environ.get(
+    'HERMES_MODEL', 'nvidia/nemotron-3-super-120b-a12b'
+)
+# A local endpoint needs no API key, and small/edge models need JSON mode + a higher token
+# cap to emit terse JSON instead of rambling (see evals/model_selection/ollama_config.json).
+_IS_LOCAL = any(h in API_BASE for h in ('localhost', '127.0.0.1', 'ollama'))
 
 _FALLBACK_CATEGORIES = [
     'food',
+    'restaurants',
+    'groceries',
+    'delivery',
     'transport',
     'entertainment',
     'health',
@@ -73,9 +87,10 @@ Given a clean transaction payload as JSON, respond with ONLY a JSON object.
 Confident case:
 {{"category": "<one of the valid categories>"}}
 
-Uncertain case — merchant is a payment gateway or multi-service platform where the
-actual purchase purpose cannot be determined from the name alone (e.g. PayU, Stripe,
-Adyen, Rappi, Amazon, or any generic capital/financial services company):
+Uncertain case — the purchase purpose cannot be determined from the merchant name
+alone. This covers payment gateways/processors (e.g. PayU, Stripe, Adyen, Rappi,
+Amazon, or any generic capital/financial services company) AND hypermarkets or
+warehouse clubs that sell both groceries and general merchandise/electronics:
 {{"category": "needs_clarification", "reason": "payment_gateway"}}
 
 Valid categories: {cats}
@@ -83,6 +98,10 @@ Valid categories: {cats}
 Rules:
 - transaction_type "transfer_out" or "transfer_in" → always "transfers"
 - transaction_type "cash" → always "cash"
+- Supermarkets and grocery stores → "groceries"
+- Restaurants, fast food, cafes, bakeries → "restaurants"
+- Food delivery platforms → "delivery"
+- Hypermarkets / warehouse clubs (groceries + electronics/general) → "needs_clarification"
 - Ride-hailing apps (Uber, Cabify, InDriver) → "transport"
 - Streaming, gaming → "entertainment"
 - Pharmacies, clinics → "health"
@@ -131,8 +150,12 @@ def main() -> None:
     parser.add_argument('--payload', required=True, help='JSON transaction payload')
     args = parser.parse_args()
 
-    api_key = os.environ.get('NEBIUS_API_KEY') or os.environ.get('OPENAI_API_KEY', '')
-    if not api_key:
+    api_key = (
+        os.environ.get('CATEGORIZER_API_KEY')
+        or os.environ.get('NEBIUS_API_KEY')
+        or os.environ.get('OPENAI_API_KEY', '')
+    )
+    if not api_key and not _IS_LOCAL:
         print(
             json.dumps({'category': 'other', 'needs_clarification': False, 'reason': 'no_api_key'})
         )
@@ -145,32 +168,38 @@ def main() -> None:
     except json.JSONDecodeError:
         payload = {'merchant': args.merchant}
 
-    body = json.dumps(
-        {
-            'model': MODEL,
-            'messages': [
-                {'role': 'system', 'content': _make_prompt(categories)},
-                {'role': 'user', 'content': json.dumps(payload)},
-            ],
-            'temperature': 0,
-            'max_tokens': 64,
-        }
-    ).encode()
+    request = {
+        'model': MODEL,
+        'messages': [
+            {'role': 'system', 'content': _make_prompt(categories)},
+            {'role': 'user', 'content': json.dumps(payload)},
+        ],
+        'temperature': 0,
+        'max_tokens': 256 if _IS_LOCAL else 64,
+    }
+    if _IS_LOCAL:
+        request['response_format'] = {'type': 'json_object'}
+    body = json.dumps(request).encode()
+
+    headers = {
+        'Content-Type': 'application/json',
+        # Attributes this call in the LLM telemetry proxy (see llm_proxy.py).
+        'X-Hermes-Op': 'categorizer',
+    }
+    if api_key:
+        headers['Authorization'] = f'Bearer {api_key}'
 
     req = urllib.request.Request(
         f'{API_BASE}/chat/completions',
         data=body,
-        headers={
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {api_key}',
-            # Attributes this call in the LLM telemetry proxy (see llm_proxy.py).
-            'X-Hermes-Op': 'categorizer',
-        },
+        headers=headers,
         method='POST',
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=15, context=_ssl_context()) as resp:
+        with urllib.request.urlopen(
+            req, timeout=180 if _IS_LOCAL else 15, context=_ssl_context()
+        ) as resp:
             data = json.loads(resp.read())
         message = data['choices'][0]['message']
         content = (message.get('content') or message.get('reasoning_content') or '').strip()

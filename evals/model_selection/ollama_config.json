@@ -1,0 +1,6 @@
+{
+  "_comment": "Generation options applied to LOCAL (Ollama) model calls in run.py. JSON mode stops reasoning/edge models (e.g. Gemma 4 E2B/E4B) from rambling prose instead of the terse JSON the categorizer prompt asks for; the higher token cap keeps a thinking model from being truncated before it emits the final JSON. Cloud tiers keep the defaults (256 tokens, no response_format). response_format is the OpenAI-standard shape; Ollama's OpenAI-compatible endpoint honors it.",
+  "max_tokens": 512,
+  "temperature": 0,
+  "response_format": { "type": "json_object" }
+}

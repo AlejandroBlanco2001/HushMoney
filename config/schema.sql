@@ -129,7 +129,10 @@ CREATE TABLE IF NOT EXISTS categories (
 INSERT INTO categories (slug, label, description, created_at)
 SELECT column1, column2, column3, strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
 FROM (VALUES
-    ('food',          'Food & Dining',        'Restaurants, cafes, supermarkets, food delivery'),
+    ('food',          'Food (other)',         'Food expenses not covered by restaurants, groceries, or delivery'),
+    ('restaurants',   'Restaurants',          'Restaurants, fast food, cafes, bakeries'),
+    ('groceries',     'Groceries',            'Supermarkets, grocery and convenience stores'),
+    ('delivery',      'Delivery',             'Food and grocery delivery platforms'),
     ('transport',     'Transport',            'Ride-hailing, taxis, fuel, parking, public transit'),
     ('entertainment', 'Entertainment',        'Streaming, gaming, cinema, concerts, events'),
     ('health',        'Health',               'Pharmacies, clinics, hospitals, gyms'),

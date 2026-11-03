@@ -39,6 +39,12 @@ services:
       - NEBIUS_API_KEY=${NEBIUS_API_KEY}
       - OPENAI_API_KEY=${NEBIUS_API_KEY}
       - OPENAI_BASE_URL=https://api.studio.nebius.ai/v1/
+      # Categorizer-only model override: lets categorization run on the local 'ollama'
+      # service while the agent stays on OPENAI_BASE_URL above. Unset → falls back to the
+      # agent endpoint/model. Enable local: `local-llm` profile + set these in .env
+      # (e.g. CATEGORIZER_BASE_URL=http://ollama:11434/v1, CATEGORIZER_MODEL=gemma4:e4b).
+      - CATEGORIZER_BASE_URL=${CATEGORIZER_BASE_URL-}
+      - CATEGORIZER_MODEL=${CATEGORIZER_MODEL-}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       - TELEGRAM_ALLOWED_USERS=${TELEGRAM_ALLOWED_USERS:-${TELEGRAM_CHAT_ID}}
@@ -143,6 +149,21 @@ services:
     ports:
       - "127.0.0.1:5080:5080"
 
+  # Local LLM server for the categorizer (opt-in). Starts only under the 'local-llm'
+  # profile. After `up`, pull a model into the volume:
+  #   podman compose exec ollama ollama pull gemma4:e4b
+  # Then point the categorizer at it in .env (CATEGORIZER_BASE_URL / CATEGORIZER_MODEL).
+  # Localhost port is also exposed so host-side evals (evals/model_selection) can reuse it.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    profiles: ["local-llm"]
+    volumes:
+      - ollama-models:/root/.ollama
+    ports:
+      - "127.0.0.1:11434:11434"
+
 volumes:
   hermes-data:
     external: true
@@ -154,3 +175,4 @@ volumes:
     external: true
     name: untyped_pattern-inbox
   openobserve-data:
+  ollama-models:

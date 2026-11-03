@@ -8,7 +8,12 @@ UV := uv run --project forwarder
 
 .DEFAULT_GOAL := help
 .PHONY: help sync lint fmt fmt-check typecheck test check \
-        run run-no-telemetry run-openshell run-no-openshell-with-telemetry down logs smoke
+        run run-no-telemetry run-openshell run-no-openshell-with-telemetry down logs smoke \
+        ollama-pull eval-local-models
+
+# Local SLM candidates benchmarked by evals/model_selection/run.py --local.
+# Keep in sync with LOCAL_MODELS in evals/lib/models.py (Qwen, Llama, Gemma, GLM, Phi).
+OLLAMA_MODELS := gemma4:e2b gemma4:e4b gemma4:12b
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -64,3 +69,11 @@ smoke: ## POST a test transaction to the running gateway (drives one LLM call)
 	  -H 'Content-Type: application/json' \
 	  -d '{"transaction_type":"debit","amount":45000,"currency":"COP","merchant":"RAPPI","date":"2026-11-03T12:00:00Z","channel":"email","account_type":"checking","bank":"bancolombia"}'; \
 	echo
+
+# ── Local SLM evals (Ollama) ────────────────────────────────────────────────
+
+ollama-pull: ## Pull local SLM candidates for `model_selection/run.py --local`
+	@for model in $(OLLAMA_MODELS); do echo ">>> ollama pull $$model"; ollama pull $$model; done
+
+eval-local-models: ## Run + auto-score the local SLMs on the golden CO merchant set
+	python3 evals/model_selection/run.py --local

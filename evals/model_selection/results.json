@@ -1,308 +1,1784 @@
 [
   {
-    "fixture": "emails/bancolombia/compra_debito",
+    "fixture": "exito_hypermarket",
     "input": {
-      "amount": 47350.0,
+      "amount": 184500,
       "currency": "COP",
-      "merchant": "RAPPI",
-      "date": "2026-09-15T17:43:00Z",
+      "merchant": "EXITO",
+      "transaction_type": "debit",
+      "account_type": "checking",
+      "channel": "sms"
+    },
+    "correct_category": "needs_clarification",
+    "models": {
+      "g4_e2b": {
+        "category": "unknown",
+        "reason": "",
+        "latency_ms": 32256,
+        "input_tokens": 395,
+        "output_tokens": 512,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "needs_clarification",
+        "reason": "hypermarket",
+        "latency_ms": 23731,
+        "input_tokens": 607,
+        "output_tokens": 17,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "unknown",
+        "reason": "",
+        "latency_ms": 166740,
+        "input_tokens": 395,
+        "output_tokens": 512,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "jumbo_hypermarket",
+    "input": {
+      "amount": 231400,
+      "currency": "COP",
+      "merchant": "JUMBO",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "sms"
+    },
+    "correct_category": "needs_clarification",
+    "models": {
+      "g4_e2b": {
+        "category": "needs_clarification",
+        "reason": "hypermarket",
+        "latency_ms": 36298,
+        "input_tokens": 713,
+        "output_tokens": 17,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "needs_clarification",
+        "reason": "payment_gateway",
+        "latency_ms": 23293,
+        "input_tokens": 770,
+        "output_tokens": 18,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "unknown",
+        "reason": "",
+        "latency_ms": 120408,
+        "input_tokens": 396,
+        "output_tokens": 512,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "pricesmart_warehouse",
+    "input": {
+      "amount": 412000,
+      "currency": "COP",
+      "merchant": "PRICESMART",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "email"
+    },
+    "correct_category": "needs_clarification",
+    "models": {
+      "g4_e2b": {
+        "category": "needs_clarification",
+        "reason": "needs_clarification",
+        "latency_ms": 36048,
+        "input_tokens": 851,
+        "output_tokens": 19,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "needs_clarification",
+        "reason": "hypermarket",
+        "latency_ms": 24257,
+        "input_tokens": 855,
+        "output_tokens": 17,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "unknown",
+        "reason": "",
+        "latency_ms": 144994,
+        "input_tokens": 396,
+        "output_tokens": 512,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "alkosto_hypermarket",
+    "input": {
+      "amount": 1890000,
+      "currency": "COP",
+      "merchant": "ALKOSTO",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "email"
+    },
+    "correct_category": "needs_clarification",
+    "models": {
+      "g4_e2b": {
+        "category": "unknown",
+        "reason": "",
+        "latency_ms": 22804,
+        "input_tokens": 397,
+        "output_tokens": 512,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "shopping",
+        "reason": "",
+        "latency_ms": 22915,
+        "input_tokens": 716,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": null,
+        "reason": "",
+        "latency_ms": null,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "error": "timed out"
+      }
+    }
+  },
+  {
+    "fixture": "olimpica_groceries",
+    "input": {
+      "amount": 96300,
+      "currency": "COP",
+      "merchant": "SUPERTIENDAS OLIMPICA",
       "transaction_type": "debit",
       "account_type": "checking",
       "channel": "email"
     },
-    "correct_category": "needs_clarification",
+    "correct_category": "groceries",
     "models": {
-      "nano": {
+      "g4_e2b": {
         "category": "needs_clarification",
         "reason": "payment_gateway",
-        "latency_ms": 1637,
-        "input_tokens": 347,
-        "output_tokens": 160,
+        "latency_ms": 15902,
+        "input_tokens": 849,
+        "output_tokens": 18,
         "error": null
       },
-      "super": {
-        "category": "food_delivery",
+      "g4_e4b": {
+        "category": "groceries",
         "reason": "",
-        "latency_ms": 1740,
-        "input_tokens": 347,
-        "output_tokens": 80,
+        "latency_ms": 11082,
+        "input_tokens": 528,
+        "output_tokens": 8,
         "error": null
       },
-      "ultra": {
+      "gemma4_12b": {
+        "category": "groceries",
+        "reason": "",
+        "latency_ms": 103527,
+        "input_tokens": 687,
+        "output_tokens": 8,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "carulla_groceries",
+    "input": {
+      "amount": 78900,
+      "currency": "COP",
+      "merchant": "CARULLA",
+      "transaction_type": "debit",
+      "account_type": "checking",
+      "channel": "sms"
+    },
+    "correct_category": "groceries",
+    "models": {
+      "g4_e2b": {
+        "category": "groceries",
+        "reason": "",
+        "latency_ms": 13036,
+        "input_tokens": 678,
+        "output_tokens": 8,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "needs_clarification",
+        "reason": "hypermarket",
+        "latency_ms": 11068,
+        "input_tokens": 555,
+        "output_tokens": 17,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "groceries",
+        "reason": "",
+        "latency_ms": 80269,
+        "input_tokens": 550,
+        "output_tokens": 8,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "d1_groceries",
+    "input": {
+      "amount": 34200,
+      "currency": "COP",
+      "merchant": "TIENDAS D1",
+      "transaction_type": "debit",
+      "account_type": "checking",
+      "channel": "sms"
+    },
+    "correct_category": "groceries",
+    "models": {
+      "g4_e2b": {
+        "category": "shopping",
+        "reason": "",
+        "latency_ms": 13096,
+        "input_tokens": 790,
+        "output_tokens": 7,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "needs_clarification",
+        "reason": "hypermarket",
+        "latency_ms": 11006,
+        "input_tokens": 578,
+        "output_tokens": 17,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "groceries",
+        "reason": "",
+        "latency_ms": 59645,
+        "input_tokens": 630,
+        "output_tokens": 8,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "ara_groceries",
+    "input": {
+      "amount": 28700,
+      "currency": "COP",
+      "merchant": "TIENDAS ARA",
+      "transaction_type": "debit",
+      "account_type": "checking",
+      "channel": "sms"
+    },
+    "correct_category": "groceries",
+    "models": {
+      "g4_e2b": {
+        "category": "unknown",
+        "reason": "",
+        "latency_ms": 8783,
+        "input_tokens": 396,
+        "output_tokens": 512,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "needs_clarification",
+        "reason": "payment_gateway",
+        "latency_ms": 11022,
+        "input_tokens": 872,
+        "output_tokens": 18,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "groceries",
+        "reason": "",
+        "latency_ms": 47402,
+        "input_tokens": 647,
+        "output_tokens": 8,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "panamericana_stationery",
+    "input": {
+      "amount": 67500,
+      "currency": "COP",
+      "merchant": "PANAMERICANA",
+      "transaction_type": "debit",
+      "account_type": "checking",
+      "channel": "sms"
+    },
+    "correct_category": "shopping",
+    "models": {
+      "g4_e2b": {
+        "category": "needs_clarification",
+        "reason": "payment_gateway",
+        "latency_ms": 17943,
+        "input_tokens": 865,
+        "output_tokens": 18,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "needs_clarification",
+        "reason": "payment_gateway",
+        "latency_ms": 13907,
+        "input_tokens": 677,
+        "output_tokens": 18,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "shopping",
+        "reason": "",
+        "latency_ms": 63763,
+        "input_tokens": 756,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "ktronix_electronics",
+    "input": {
+      "amount": 2350000,
+      "currency": "COP",
+      "merchant": "KTRONIX",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "email"
+    },
+    "correct_category": "shopping",
+    "models": {
+      "g4_e2b": {
+        "category": "unknown",
+        "reason": "",
+        "latency_ms": 7323,
+        "input_tokens": 398,
+        "output_tokens": 512,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "shopping",
+        "reason": "",
+        "latency_ms": 13788,
+        "input_tokens": 717,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "shopping",
+        "reason": "",
+        "latency_ms": 63917,
+        "input_tokens": 807,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "falabella_department",
+    "input": {
+      "amount": 320000,
+      "currency": "COP",
+      "merchant": "FALABELLA",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "email"
+    },
+    "correct_category": "shopping",
+    "models": {
+      "g4_e2b": {
+        "category": "unknown",
+        "reason": "",
+        "latency_ms": 11117,
+        "input_tokens": 398,
+        "output_tokens": 512,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "needs_clarification",
+        "reason": "hypermarket",
+        "latency_ms": 13825,
+        "input_tokens": 552,
+        "output_tokens": 17,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "shopping",
+        "reason": "",
+        "latency_ms": 64502,
+        "input_tokens": 679,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "presto_restaurant",
+    "input": {
+      "amount": 42000,
+      "currency": "COP",
+      "merchant": "PRESTO",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "sms"
+    },
+    "correct_category": "restaurants",
+    "models": {
+      "g4_e2b": {
+        "category": "unknown",
+        "reason": "",
+        "latency_ms": 10905,
+        "input_tokens": 394,
+        "output_tokens": 512,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "needs_clarification",
+        "reason": "merchant_ambiguity",
+        "latency_ms": 13867,
+        "input_tokens": 830,
+        "output_tokens": 19,
+        "error": null
+      },
+      "gemma4_12b": {
         "category": "transport",
         "reason": "",
-        "latency_ms": 2524,
-        "input_tokens": 347,
-        "output_tokens": 151,
+        "latency_ms": 64552,
+        "input_tokens": 582,
+        "output_tokens": 7,
         "error": null
       }
     }
   },
   {
-    "fixture": "emails/bancolombia/pago_boton",
+    "fixture": "el_corral_restaurant",
     "input": {
-      "amount": 85000.0,
+      "amount": 56800,
       "currency": "COP",
-      "merchant": "PEXTO CAPITAL SAS",
-      "date": "2026-09-14T08:43:19Z",
-      "transaction_type": "payment",
+      "merchant": "HAMBURGUESAS EL CORRAL",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "sms"
+    },
+    "correct_category": "restaurants",
+    "models": {
+      "g4_e2b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 17391,
+        "input_tokens": 690,
+        "output_tokens": 7,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 9313,
+        "input_tokens": 533,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 42851,
+        "input_tokens": 639,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "mcdonalds_restaurant",
+    "input": {
+      "amount": 38900,
+      "currency": "COP",
+      "merchant": "MCDONALDS",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "sms"
+    },
+    "correct_category": "restaurants",
+    "models": {
+      "g4_e2b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 13605,
+        "input_tokens": 692,
+        "output_tokens": 7,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 9342,
+        "input_tokens": 540,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 42504,
+        "input_tokens": 607,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "burger_king_restaurant",
+    "input": {
+      "amount": 34500,
+      "currency": "COP",
+      "merchant": "BURGER KING",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "sms"
+    },
+    "correct_category": "restaurants",
+    "models": {
+      "g4_e2b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 13585,
+        "input_tokens": 685,
+        "output_tokens": 7,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 9234,
+        "input_tokens": 623,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 41954,
+        "input_tokens": 588,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "frisby_restaurant",
+    "input": {
+      "amount": 45200,
+      "currency": "COP",
+      "merchant": "FRISBY",
+      "transaction_type": "debit",
       "account_type": "checking",
+      "channel": "sms"
+    },
+    "correct_category": "restaurants",
+    "models": {
+      "g4_e2b": {
+        "category": "unknown",
+        "reason": "",
+        "latency_ms": 9529,
+        "input_tokens": 395,
+        "output_tokens": 512,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "needs_clarification",
+        "reason": "merchant_unknown",
+        "latency_ms": 9116,
+        "input_tokens": 722,
+        "output_tokens": 18,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 41889,
+        "input_tokens": 582,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "crepes_waffles_restaurant",
+    "input": {
+      "amount": 72000,
+      "currency": "COP",
+      "merchant": "CREPES & WAFFLES",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "email"
+    },
+    "correct_category": "restaurants",
+    "models": {
+      "g4_e2b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 8758,
+        "input_tokens": 694,
+        "output_tokens": 7,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 10787,
+        "input_tokens": 526,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 46432,
+        "input_tokens": 605,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "juan_valdez_restaurant",
+    "input": {
+      "amount": 19800,
+      "currency": "COP",
+      "merchant": "JUAN VALDEZ CAFE",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "sms"
+    },
+    "correct_category": "restaurants",
+    "models": {
+      "g4_e2b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 2586,
+        "input_tokens": 399,
+        "output_tokens": 7,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 10776,
+        "input_tokens": 511,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 46479,
+        "input_tokens": 560,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "kokoriko_restaurant",
+    "input": {
+      "amount": 48300,
+      "currency": "COP",
+      "merchant": "KOKORIKO",
+      "transaction_type": "debit",
+      "account_type": "checking",
+      "channel": "sms"
+    },
+    "correct_category": "restaurants",
+    "models": {
+      "g4_e2b": {
+        "category": "unknown",
+        "reason": "",
+        "latency_ms": 5837,
+        "input_tokens": 396,
+        "output_tokens": 512,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "other",
+        "reason": "",
+        "latency_ms": 10931,
+        "input_tokens": 855,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 46559,
+        "input_tokens": 662,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "jyp_local_restaurant",
+    "input": {
+      "amount": 23500,
+      "currency": "COP",
+      "merchant": "J&P COMIDAS",
+      "transaction_type": "debit",
+      "account_type": "checking",
+      "channel": "sms"
+    },
+    "correct_category": "restaurants",
+    "models": {
+      "g4_e2b": {
+        "category": "groceries",
+        "reason": "",
+        "latency_ms": 10376,
+        "input_tokens": 717,
+        "output_tokens": 8,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 10812,
+        "input_tokens": 615,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 46635,
+        "input_tokens": 657,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "danny_local_restaurant",
+    "input": {
+      "amount": 18900,
+      "currency": "COP",
+      "merchant": "DANNY FAST FOODS",
+      "transaction_type": "debit",
+      "account_type": "checking",
+      "channel": "sms"
+    },
+    "correct_category": "restaurants",
+    "models": {
+      "g4_e2b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 6117,
+        "input_tokens": 397,
+        "output_tokens": 7,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 6153,
+        "input_tokens": 504,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 49118,
+        "input_tokens": 535,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "asadero_local_restaurant",
+    "input": {
+      "amount": 29000,
+      "currency": "COP",
+      "merchant": "ASADERO EL BUEN POLLO",
+      "transaction_type": "debit",
+      "account_type": "checking",
+      "channel": "sms"
+    },
+    "correct_category": "restaurants",
+    "models": {
+      "g4_e2b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 11073,
+        "input_tokens": 690,
+        "output_tokens": 7,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 6176,
+        "input_tokens": 537,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "restaurants",
+        "reason": "",
+        "latency_ms": 49332,
+        "input_tokens": 784,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "rappi_gateway",
+    "input": {
+      "amount": 54300,
+      "currency": "COP",
+      "merchant": "RAPPI COLOMBIA",
+      "transaction_type": "debit",
+      "account_type": "credit",
       "channel": "email"
     },
     "correct_category": "needs_clarification",
     "models": {
-      "nano": {
+      "g4_e2b": {
         "category": "needs_clarification",
         "reason": "payment_gateway",
-        "latency_ms": 1979,
-        "input_tokens": 351,
-        "output_tokens": 101,
+        "latency_ms": 11808,
+        "input_tokens": 815,
+        "output_tokens": 18,
         "error": null
       },
-      "super": {
-        "category": "other",
+      "g4_e4b": {
+        "category": "delivery",
         "reason": "",
-        "latency_ms": 2179,
-        "input_tokens": 351,
-        "output_tokens": 172,
+        "latency_ms": 5998,
+        "input_tokens": 534,
+        "output_tokens": 7,
         "error": null
       },
-      "ultra": {
-        "category": "needs_clarification",
-        "reason": "payment_gateway",
-        "latency_ms": 3651,
-        "input_tokens": 351,
-        "output_tokens": 110,
+      "gemma4_12b": {
+        "category": "delivery",
+        "reason": "",
+        "latency_ms": 49550,
+        "input_tokens": 584,
+        "output_tokens": 7,
         "error": null
       }
     }
   },
   {
-    "fixture": "emails/bancolombia/transferencia_enviada",
+    "fixture": "ifood_delivery",
     "input": {
-      "amount": 120000.0,
+      "amount": 41200,
       "currency": "COP",
-      "date": "2026-09-14T04:54:00Z",
-      "transaction_type": "transfer_out",
-      "account_type": "checking",
+      "merchant": "IFOOD",
+      "transaction_type": "debit",
+      "account_type": "credit",
       "channel": "email"
     },
-    "correct_category": "transfer",
+    "correct_category": "delivery",
     "models": {
-      "nano": {
-        "category": "transfer",
+      "g4_e2b": {
+        "category": "delivery",
         "reason": "",
-        "latency_ms": 1309,
-        "input_tokens": 341,
-        "output_tokens": 41,
+        "latency_ms": 11824,
+        "input_tokens": 832,
+        "output_tokens": 7,
         "error": null
       },
-      "super": {
-        "category": "transfer",
+      "g4_e4b": {
+        "category": "delivery",
         "reason": "",
-        "latency_ms": 995,
-        "input_tokens": 341,
-        "output_tokens": 58,
+        "latency_ms": 5913,
+        "input_tokens": 491,
+        "output_tokens": 7,
         "error": null
       },
-      "ultra": {
-        "category": "transfer",
+      "gemma4_12b": {
+        "category": "delivery",
         "reason": "",
-        "latency_ms": 1174,
-        "input_tokens": 341,
-        "output_tokens": 62,
+        "latency_ms": 49466,
+        "input_tokens": 573,
+        "output_tokens": 7,
         "error": null
       }
     }
   },
   {
-    "fixture": "emails/bancolombia/transferencia_recibida",
+    "fixture": "didi_transport",
     "input": {
-      "amount": 250000.0,
+      "amount": 14300,
       "currency": "COP",
-      "date": "2026-09-14T13:06:00Z",
-      "transaction_type": "transfer_in",
-      "account_type": "checking",
-      "channel": "email"
-    },
-    "correct_category": "transfer",
-    "models": {
-      "nano": {
-        "category": "transfer",
-        "reason": "",
-        "latency_ms": 1051,
-        "input_tokens": 341,
-        "output_tokens": 42,
-        "error": null
-      },
-      "super": {
-        "category": "transfer",
-        "reason": "",
-        "latency_ms": 951,
-        "input_tokens": 341,
-        "output_tokens": 33,
-        "error": null
-      },
-      "ultra": {
-        "category": "transfer",
-        "reason": "",
-        "latency_ms": 1796,
-        "input_tokens": 341,
-        "output_tokens": 61,
-        "error": null
-      }
-    }
-  },
-  {
-    "fixture": "sms/bancolombia/compra_debito",
-    "input": {
-      "amount": 32500.0,
-      "currency": "COP",
-      "merchant": "UBER RIDES",
-      "date": "2026-09-16T01:35:00Z",
+      "merchant": "DIDI",
       "transaction_type": "debit",
       "account_type": "checking",
       "channel": "sms"
     },
     "correct_category": "transport",
     "models": {
-      "nano": {
-        "category": "transport",
-        "reason": "",
-        "latency_ms": 1082,
-        "input_tokens": 350,
-        "output_tokens": 44,
+      "g4_e2b": {
+        "category": "needs_clarification",
+        "reason": "payment_gateway",
+        "latency_ms": 10171,
+        "input_tokens": 787,
+        "output_tokens": 18,
         "error": null
       },
-      "super": {
+      "g4_e4b": {
         "category": "transport",
         "reason": "",
-        "latency_ms": 934,
-        "input_tokens": 350,
-        "output_tokens": 38,
+        "latency_ms": 5562,
+        "input_tokens": 490,
+        "output_tokens": 7,
         "error": null
       },
-      "ultra": {
+      "gemma4_12b": {
         "category": "transport",
         "reason": "",
-        "latency_ms": 1047,
-        "input_tokens": 350,
-        "output_tokens": 52,
+        "latency_ms": 35361,
+        "input_tokens": 544,
+        "output_tokens": 7,
         "error": null
       }
     }
   },
   {
-    "fixture": "sms/bancolombia/pago_boton",
+    "fixture": "uber_transport",
     "input": {
-      "amount": 62000.0,
+      "amount": 21700,
       "currency": "COP",
-      "merchant": "PEXTO CAPITAL SAS",
-      "date": "2026-09-14T03:20:37Z",
-      "transaction_type": "payment",
+      "merchant": "UBER",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "sms"
+    },
+    "correct_category": "transport",
+    "models": {
+      "g4_e2b": {
+        "category": "transport",
+        "reason": "",
+        "latency_ms": 3559,
+        "input_tokens": 394,
+        "output_tokens": 7,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "transport",
+        "reason": "",
+        "latency_ms": 5536,
+        "input_tokens": 486,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "transport",
+        "reason": "",
+        "latency_ms": 35114,
+        "input_tokens": 590,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "cabify_transport",
+    "input": {
+      "amount": 18500,
+      "currency": "COP",
+      "merchant": "CABIFY",
+      "transaction_type": "debit",
       "account_type": "checking",
       "channel": "sms"
+    },
+    "correct_category": "transport",
+    "models": {
+      "g4_e2b": {
+        "category": "unknown",
+        "reason": "",
+        "latency_ms": 4499,
+        "input_tokens": 394,
+        "output_tokens": 512,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "transport",
+        "reason": "",
+        "latency_ms": 5512,
+        "input_tokens": 487,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "transport",
+        "reason": "",
+        "latency_ms": 34766,
+        "input_tokens": 542,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "indriver_transport",
+    "input": {
+      "amount": 12800,
+      "currency": "COP",
+      "merchant": "INDRIVER",
+      "transaction_type": "debit",
+      "account_type": "checking",
+      "channel": "sms"
+    },
+    "correct_category": "transport",
+    "models": {
+      "g4_e2b": {
+        "category": "transport",
+        "reason": "",
+        "latency_ms": 16731,
+        "input_tokens": 730,
+        "output_tokens": 7,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "transport",
+        "reason": "",
+        "latency_ms": 5534,
+        "input_tokens": 538,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "transport",
+        "reason": "",
+        "latency_ms": 34731,
+        "input_tokens": 548,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "transmilenio_transport",
+    "input": {
+      "amount": 3200,
+      "currency": "COP",
+      "merchant": "TULLAVE TRANSMILENIO",
+      "transaction_type": "debit",
+      "account_type": "checking",
+      "channel": "sms"
+    },
+    "correct_category": "transport",
+    "models": {
+      "g4_e2b": {
+        "category": "needs_clarification",
+        "reason": "merchant_name",
+        "latency_ms": 16839,
+        "input_tokens": 834,
+        "output_tokens": 18,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "transport",
+        "reason": "",
+        "latency_ms": 11756,
+        "input_tokens": 550,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "transport",
+        "reason": "",
+        "latency_ms": 47456,
+        "input_tokens": 609,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "terpel_fuel",
+    "input": {
+      "amount": 120000,
+      "currency": "COP",
+      "merchant": "ESTACION TERPEL",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "sms"
+    },
+    "correct_category": "fuel",
+    "models": {
+      "g4_e2b": {
+        "category": "unknown",
+        "reason": "",
+        "latency_ms": 12599,
+        "input_tokens": 397,
+        "output_tokens": 512,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "fuel",
+        "reason": "",
+        "latency_ms": 11782,
+        "input_tokens": 555,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "fuel",
+        "reason": "",
+        "latency_ms": 47433,
+        "input_tokens": 575,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "primax_fuel",
+    "input": {
+      "amount": 95000,
+      "currency": "COP",
+      "merchant": "PRIMAX",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "sms"
+    },
+    "correct_category": "fuel",
+    "models": {
+      "g4_e2b": {
+        "category": "unknown",
+        "reason": "",
+        "latency_ms": 12192,
+        "input_tokens": 394,
+        "output_tokens": 512,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "unknown",
+        "reason": "",
+        "latency_ms": 9206,
+        "input_tokens": 394,
+        "output_tokens": 512,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "fuel",
+        "reason": "",
+        "latency_ms": 47454,
+        "input_tokens": 595,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "cine_colombia_entertainment",
+    "input": {
+      "amount": 32000,
+      "currency": "COP",
+      "merchant": "CINE COLOMBIA",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "sms"
+    },
+    "correct_category": "entertainment",
+    "models": {
+      "g4_e2b": {
+        "category": "entertainment",
+        "reason": "",
+        "latency_ms": 4105,
+        "input_tokens": 397,
+        "output_tokens": 7,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "entertainment",
+        "reason": "",
+        "latency_ms": 13343,
+        "input_tokens": 588,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "entertainment",
+        "reason": "",
+        "latency_ms": 47601,
+        "input_tokens": 718,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "netflix_subscription",
+    "input": {
+      "amount": 38900,
+      "currency": "COP",
+      "merchant": "NETFLIX",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "email"
+    },
+    "correct_category": "subscriptions",
+    "models": {
+      "g4_e2b": {
+        "category": "subscriptions",
+        "reason": "",
+        "latency_ms": 797,
+        "input_tokens": 395,
+        "output_tokens": 7,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "subscriptions",
+        "reason": "",
+        "latency_ms": 7148,
+        "input_tokens": 573,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "subscriptions",
+        "reason": "",
+        "latency_ms": 44455,
+        "input_tokens": 637,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "spotify_subscription",
+    "input": {
+      "amount": 16900,
+      "currency": "COP",
+      "merchant": "SPOTIFY",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "email"
+    },
+    "correct_category": "subscriptions",
+    "models": {
+      "g4_e2b": {
+        "category": "subscriptions",
+        "reason": "",
+        "latency_ms": 733,
+        "input_tokens": 394,
+        "output_tokens": 7,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "subscriptions",
+        "reason": "",
+        "latency_ms": 7327,
+        "input_tokens": 512,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "subscriptions",
+        "reason": "",
+        "latency_ms": 44460,
+        "input_tokens": 593,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "cruz_verde_pharmacy",
+    "input": {
+      "amount": 48700,
+      "currency": "COP",
+      "merchant": "CRUZ VERDE",
+      "transaction_type": "debit",
+      "account_type": "checking",
+      "channel": "sms"
+    },
+    "correct_category": "health",
+    "models": {
+      "g4_e2b": {
+        "category": "unknown",
+        "reason": "",
+        "latency_ms": 4487,
+        "input_tokens": 396,
+        "output_tokens": 512,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "health",
+        "reason": "",
+        "latency_ms": 7307,
+        "input_tokens": 512,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "health",
+        "reason": "",
+        "latency_ms": 44472,
+        "input_tokens": 637,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "farmatodo_pharmacy",
+    "input": {
+      "amount": 63400,
+      "currency": "COP",
+      "merchant": "FARMATODO",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "sms"
+    },
+    "correct_category": "health",
+    "models": {
+      "g4_e2b": {
+        "category": "groceries",
+        "reason": "",
+        "latency_ms": 15448,
+        "input_tokens": 768,
+        "output_tokens": 8,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "health",
+        "reason": "",
+        "latency_ms": 6718,
+        "input_tokens": 617,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "health",
+        "reason": "",
+        "latency_ms": 44309,
+        "input_tokens": 550,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "claro_telecom",
+    "input": {
+      "amount": 89900,
+      "currency": "COP",
+      "merchant": "CLARO COLOMBIA",
+      "transaction_type": "debit",
+      "account_type": "checking",
+      "channel": "email"
+    },
+    "correct_category": "utilities",
+    "models": {
+      "g4_e2b": {
+        "category": "utilities",
+        "reason": "",
+        "latency_ms": 15459,
+        "input_tokens": 748,
+        "output_tokens": 7,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "utilities",
+        "reason": "",
+        "latency_ms": 9352,
+        "input_tokens": 521,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "utilities",
+        "reason": "",
+        "latency_ms": 41976,
+        "input_tokens": 586,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "epm_utility",
+    "input": {
+      "amount": 156000,
+      "currency": "COP",
+      "merchant": "EPM",
+      "transaction_type": "debit",
+      "account_type": "checking",
+      "channel": "email"
+    },
+    "correct_category": "utilities",
+    "models": {
+      "g4_e2b": {
+        "category": "needs_clarification",
+        "reason": "payment_gateway",
+        "latency_ms": 15547,
+        "input_tokens": 809,
+        "output_tokens": 18,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "utilities",
+        "reason": "",
+        "latency_ms": 9451,
+        "input_tokens": 510,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "utilities",
+        "reason": "",
+        "latency_ms": 41974,
+        "input_tokens": 590,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "bodytech_fitness",
+    "input": {
+      "amount": 129000,
+      "currency": "COP",
+      "merchant": "BODYTECH",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "email"
+    },
+    "correct_category": "fitness",
+    "models": {
+      "g4_e2b": {
+        "category": "needs_clarification",
+        "reason": "payment_gateway",
+        "latency_ms": 11752,
+        "input_tokens": 772,
+        "output_tokens": 18,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "health",
+        "reason": "",
+        "latency_ms": 9522,
+        "input_tokens": 764,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "fitness",
+        "reason": "",
+        "latency_ms": 41955,
+        "input_tokens": 621,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "payu_gateway",
+    "input": {
+      "amount": 210000,
+      "currency": "COP",
+      "merchant": "PAYU COLOMBIA",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "email"
     },
     "correct_category": "needs_clarification",
     "models": {
-      "nano": {
+      "g4_e2b": {
         "category": "needs_clarification",
         "reason": "payment_gateway",
-        "latency_ms": 1379,
-        "input_tokens": 352,
-        "output_tokens": 101,
+        "latency_ms": 13031,
+        "input_tokens": 769,
+        "output_tokens": 18,
         "error": null
       },
-      "super": {
-        "category": "services",
-        "reason": "",
-        "latency_ms": 2329,
-        "input_tokens": 352,
-        "output_tokens": 256,
-        "error": null
-      },
-      "ultra": {
+      "g4_e4b": {
         "category": "needs_clarification",
         "reason": "payment_gateway",
-        "latency_ms": 2193,
-        "input_tokens": 352,
-        "output_tokens": 110,
+        "latency_ms": 10278,
+        "input_tokens": 622,
+        "output_tokens": 18,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "needs_clarification",
+        "reason": "payment_gateway",
+        "latency_ms": 42411,
+        "input_tokens": 584,
+        "output_tokens": 18,
         "error": null
       }
     }
   },
   {
-    "fixture": "sms/bancolombia/transferencia_enviada",
+    "fixture": "mercadopago_gateway",
     "input": {
-      "amount": 75000.0,
+      "amount": 73500,
       "currency": "COP",
-      "date": "2026-09-14T04:54:00Z",
+      "merchant": "MERCADO PAGO",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "email"
+    },
+    "correct_category": "needs_clarification",
+    "models": {
+      "g4_e2b": {
+        "category": "needs_clarification",
+        "reason": "payment_gateway",
+        "latency_ms": 13106,
+        "input_tokens": 839,
+        "output_tokens": 18,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "needs_clarification",
+        "reason": "payment_gateway",
+        "latency_ms": 8697,
+        "input_tokens": 593,
+        "output_tokens": 18,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "needs_clarification",
+        "reason": "payment_gateway",
+        "latency_ms": 43506,
+        "input_tokens": 611,
+        "output_tokens": 18,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "wompi_gateway",
+    "input": {
+      "amount": 45000,
+      "currency": "COP",
+      "merchant": "WOMPI",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "email"
+    },
+    "correct_category": "needs_clarification",
+    "models": {
+      "g4_e2b": {
+        "category": "needs_clarification",
+        "reason": "payment_gateway",
+        "latency_ms": 13111,
+        "input_tokens": 897,
+        "output_tokens": 18,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "needs_clarification",
+        "reason": "hypermarket",
+        "latency_ms": 7982,
+        "input_tokens": 536,
+        "output_tokens": 17,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "needs_clarification",
+        "reason": "payment_gateway",
+        "latency_ms": 43912,
+        "input_tokens": 598,
+        "output_tokens": 18,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "pse_gateway",
+    "input": {
+      "amount": 320000,
+      "currency": "COP",
+      "merchant": "PSE PAGO EN LINEA",
+      "transaction_type": "debit",
+      "account_type": "checking",
+      "channel": "email"
+    },
+    "correct_category": "needs_clarification",
+    "models": {
+      "g4_e2b": {
+        "category": "needs_clarification",
+        "reason": "payment_gateway",
+        "latency_ms": 13125,
+        "input_tokens": 818,
+        "output_tokens": 18,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "needs_clarification",
+        "reason": "payment_gateway",
+        "latency_ms": 8031,
+        "input_tokens": 595,
+        "output_tokens": 18,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "needs_clarification",
+        "reason": "payment_gateway",
+        "latency_ms": 44332,
+        "input_tokens": 611,
+        "output_tokens": 18,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "avianca_travel",
+    "input": {
+      "amount": 680000,
+      "currency": "COP",
+      "merchant": "AVIANCA",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "email"
+    },
+    "correct_category": "travel",
+    "models": {
+      "g4_e2b": {
+        "category": "travel",
+        "reason": "",
+        "latency_ms": 7281,
+        "input_tokens": 644,
+        "output_tokens": 7,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "travel",
+        "reason": "",
+        "latency_ms": 7789,
+        "input_tokens": 516,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "travel",
+        "reason": "",
+        "latency_ms": 43919,
+        "input_tokens": 608,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "booking_accommodation",
+    "input": {
+      "amount": 540000,
+      "currency": "COP",
+      "merchant": "BOOKING.COM",
+      "transaction_type": "debit",
+      "account_type": "credit",
+      "channel": "email"
+    },
+    "correct_category": "accommodation",
+    "models": {
+      "g4_e2b": {
+        "category": "travel",
+        "reason": "",
+        "latency_ms": 7257,
+        "input_tokens": 758,
+        "output_tokens": 7,
+        "error": null
+      },
+      "g4_e4b": {
+        "category": "travel",
+        "reason": "",
+        "latency_ms": 6407,
+        "input_tokens": 563,
+        "output_tokens": 7,
+        "error": null
+      },
+      "gemma4_12b": {
+        "category": "accommodation",
+        "reason": "",
+        "latency_ms": 30676,
+        "input_tokens": 644,
+        "output_tokens": 7,
+        "error": null
+      }
+    }
+  },
+  {
+    "fixture": "transfer_out_no_merchant",
+    "input": {
+      "amount": 250000,
+      "currency": "COP",
       "transaction_type": "transfer_out",
       "account_type": "checking",
-      "channel": "sms"
+      "channel": "email"
     },
     "correct_category": "transfer",
     "models": {
-      "nano": {
+      "g4_e2b": {
         "category": "transfer",
         "reason": "",
-        "latency_ms": 1019,
-        "input_tokens": 341,
-        "output_tokens": 34,
+        "latency_ms": 7184,
+        "input_tokens": 549,
+        "output_tokens": 7,
         "error": null
       },
-      "super": {
+      "g4_e4b": {
         "category": "transfer",
         "reason": "",
-        "latency_ms": 1407,
-        "input_tokens": 341,
-        "output_tokens": 36,
+        "latency_ms": 5062,
+        "input_tokens": 508,
+        "output_tokens": 7,
         "error": null
       },
-      "ultra": {
+      "gemma4_12b": {
         "category": "transfer",
         "reason": "",
-        "latency_ms": 2097,
-        "input_tokens": 341,
-        "output_tokens": 59,
+        "latency_ms": 30248,
+        "input_tokens": 582,
+        "output_tokens": 7,
         "error": null
       }
     }
   },
   {
-    "fixture": "sms/bancolombia/transferencia_recibida",
+    "fixture": "atm_withdrawal",
     "input": {
-      "amount": 185000.0,
+      "amount": 200000,
       "currency": "COP",
-      "date": "2026-09-14T06:40:00Z",
-      "transaction_type": "transfer_in",
+      "transaction_type": "cash",
       "account_type": "checking",
       "channel": "sms"
     },
-    "correct_category": "transfer",
+    "correct_category": "cash",
     "models": {
-      "nano": {
-        "category": "transfer",
+      "g4_e2b": {
+        "category": "cash",
         "reason": "",
-        "latency_ms": 907,
-        "input_tokens": 342,
-        "output_tokens": 42,
+        "latency_ms": 7111,
+        "input_tokens": 549,
+        "output_tokens": 7,
         "error": null
       },
-      "super": {
-        "category": "transfer",
+      "g4_e4b": {
+        "category": "cash",
         "reason": "",
-        "latency_ms": 975,
-        "input_tokens": 342,
-        "output_tokens": 57,
+        "latency_ms": 4934,
+        "input_tokens": 496,
+        "output_tokens": 7,
         "error": null
       },
-      "ultra": {
-        "category": "transfer",
+      "gemma4_12b": {
+        "category": "cash",
         "reason": "",
-        "latency_ms": 2627,
-        "input_tokens": 342,
-        "output_tokens": 60,
+        "latency_ms": 29765,
+        "input_tokens": 526,
+        "output_tokens": 7,
         "error": null
       }
     }
