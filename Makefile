@@ -8,11 +8,11 @@ UV := uv run --project forwarder
 
 .DEFAULT_GOAL := help
 .PHONY: help sync lint fmt fmt-check typecheck test check \
-        run run-no-telemetry run-openshell run-no-openshell-with-telemetry down logs smoke \
-        ollama-pull eval-local-models
+        run run-no-telemetry run-openshell run-no-openshell-with-telemetry run-local-models \
+        down logs smoke ollama-pull eval-local-models
 
 # Local SLM candidates benchmarked by evals/model_selection/run.py --local.
-# Keep in sync with LOCAL_MODELS in evals/lib/models.py (Qwen, Llama, Gemma, GLM, Phi).
+# Keep in sync with LOCAL_MODELS in evals/lib/models.py (Gemma 4 E2B/E4B/12B).
 OLLAMA_MODELS := gemma4:e2b gemma4:e4b gemma4:12b
 
 help: ## Show this help
@@ -46,6 +46,9 @@ check: lint fmt-check typecheck test ## Run everything CI runs
 
 run: ## Start the full stack with telemetry (OpenObserve at :5080)
 	./scripts/dev.sh --no-openshell
+
+run-local-models: ## Start full stack: telemetry + no OpenShell + local Ollama models
+	./scripts/dev.sh --no-openshell --local-models
 
 run-no-telemetry: ## Start the full stack without the OpenObserve sink
 	./scripts/dev.sh --no-openshell --no-telemetry

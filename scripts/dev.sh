@@ -5,6 +5,7 @@
 #   ./scripts/dev.sh                             # OpenShell sandbox (default)
 #   ./scripts/dev.sh --no-openshell              # plain podman compose, full stack
 #   ./scripts/dev.sh --no-openshell --no-telemetry # full stack without OpenObserve
+#   ./scripts/dev.sh --no-openshell --local-models # full stack + local Ollama (local-llm profile)
 #   ./scripts/dev.sh --down                      # stop and remove everything
 #   ./scripts/dev.sh --logs                      # tail logs from the running stack
 #
@@ -33,15 +34,17 @@ error() { echo -e "${RED}[error]${NC} $*" >&2; exit 1; }
 
 USE_OPENSHELL=true
 TELEMETRY=true
+LOCAL_MODELS=false
 MODE=up
 
 for arg in "$@"; do
     case $arg in
         --no-openshell) USE_OPENSHELL=false ;;
         --no-telemetry) TELEMETRY=false ;;
+        --local-models) LOCAL_MODELS=true ;;
         --down)         MODE=down ;;
         --logs)         MODE=logs ;;
-        *) error "Unknown argument: $arg. Usage: dev.sh [--no-openshell] [--no-telemetry] [--down] [--logs]" ;;
+        *) error "Unknown argument: $arg. Usage: dev.sh [--no-openshell] [--no-telemetry] [--local-models] [--down] [--logs]" ;;
     esac
 done
 
@@ -60,8 +63,8 @@ sandbox_exists() { openshell sandbox list 2>/dev/null | grep -q "$SANDBOX_NAME";
 
 if [[ "$MODE" == down ]]; then
     info "Stopping forwarder..."
-    # --profile telemetry so the OpenObserve container is torn down too.
-    podman compose --profile telemetry down 2>/dev/null || true
+    # Name every profile so the OpenObserve + Ollama containers are torn down too.
+    podman compose --profile telemetry --profile local-llm down 2>/dev/null || true
 
     if sandbox_exists; then
         info "Stopping OpenShell sandbox..."
@@ -113,13 +116,18 @@ if [[ "$USE_OPENSHELL" == false ]]; then
     HERMES_UID=$(id -u)
     HERMES_GID=$(id -g)
 
+    # Compose profiles: telemetry → OpenObserve, local-llm → the Ollama service.
+    PROFILE_ARGS=()
+    [[ "$TELEMETRY" == true ]] && PROFILE_ARGS+=(--profile telemetry)
+    [[ "$LOCAL_MODELS" == true ]] && PROFILE_ARGS+=(--profile local-llm)
+
     if [[ "$TELEMETRY" == true ]]; then
         info "Starting full stack (with telemetry → OpenObserve)..."
-        podman compose --profile telemetry up -d --build
+        podman compose "${PROFILE_ARGS[@]}" up -d --build
     else
         info "Starting full stack (telemetry sink disabled)..."
         # Empty OPENOBSERVE_URL makes the in-container proxy a no-op recorder.
-        OPENOBSERVE_URL='' podman compose up -d --build
+        OPENOBSERVE_URL='' podman compose "${PROFILE_ARGS[@]}" up -d --build
     fi
 
     echo ""
@@ -127,6 +135,11 @@ if [[ "$USE_OPENSHELL" == false ]]; then
     echo "  Logs:       ./scripts/dev.sh --logs"
     echo "  Stop:       ./scripts/dev.sh --down"
     [[ "$TELEMETRY" == true ]] && echo "  Telemetry:  http://127.0.0.1:5080  (OpenObserve)"
+    if [[ "$LOCAL_MODELS" == true ]]; then
+        echo "  Local LLM:  http://127.0.0.1:11434  (Ollama)"
+        echo "    First run: podman compose exec ollama ollama pull gemma4:e4b"
+        echo "    Then set in .env: CATEGORIZER_BASE_URL=http://ollama:11434/v1 CATEGORIZER_MODEL=gemma4:e4b"
+    fi
     echo ""
     echo "  Smoke test a transaction:"
     echo "    make smoke   # or the curl in 'make help'"
