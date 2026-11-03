@@ -14,16 +14,30 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     python3 \
     python3-pip \
+    libatomic1 \
     && rm -rf /var/lib/apt/lists/*
+# libatomic1: the hermes-agent installer's bundled Node needs it. When the installer
+# runs as root it auto-apt-installs missing libs; running it as the 'sandbox' user
+# (below) it cannot, so we pre-install it here in the root apt layer.
+
+# OpenShell requires a non-root workload user named 'sandbox' (it rejects root).
+# Create it BEFORE the hermes install and run that install AS the user, so the large
+# /root/.local dependency tree is owned by 1000:1000 at creation. This avoids a slow
+# `chown -R /root` at the end (which would copy the whole tree into a new layer).
+# Home is /root so hermes state (/root/.hermes) and the install (/root/.local) are
+# found and owned by it. Compose still runs as root (default image user) and can
+# read/write these; OpenShell runs as 'sandbox'.
+RUN groupadd -g 1000 sandbox \
+ && useradd -u 1000 -g 1000 -M -d /root -s /bin/bash sandbox \
+ && chown -R sandbox:sandbox /root  # recursive, but /root only holds skeleton dotfiles here
+ENV HOME=/root
+ENV PATH="/root/.local/bin:$PATH"
+
+# ── Install hermes-agent as 'sandbox' so /root/.local is owned correctly ─────────
+USER sandbox
 
 # Install hermes-agent (manages its own runtime deps)
 RUN curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-computer-use --skip-browser
-
-ENV PATH="/root/.local/bin:$PATH"
-
-# Symlink hermes to /usr/local/bin so OpenShell's sandbox user can execute it
-# (OpenShell binds network/filesystem policy rules to the binary path)
-RUN ln -sf /root/.local/bin/hermes /usr/local/bin/hermes
 
 # Commit the hermes runtime dependency environment at build time. Under OpenShell
 # the sandbox network policy blocks PyPI, so a first-run `hermes pm repair` would
@@ -37,6 +51,13 @@ RUN hermes pm repair
 # the rejected token and would otherwise hang the build. See the script for details.
 COPY scripts/warmup_telegram_deps.sh /usr/local/bin/warmup_telegram_deps.sh
 RUN sh /usr/local/bin/warmup_telegram_deps.sh
+
+# ── Root again for system-level writes (symlink, system pip, app files) ──────────
+USER root
+
+# Symlink hermes to /usr/local/bin so OpenShell's sandbox user can execute it
+# (OpenShell binds network/filesystem policy rules to the binary path)
+RUN ln -sf /root/.local/bin/hermes /usr/local/bin/hermes
 
 # HTTP gateway server + LLM telemetry proxy deps
 RUN python3 -m pip install --no-cache-dir --break-system-packages starlette uvicorn httpx
@@ -57,13 +78,9 @@ COPY llm_proxy.py /app/llm_proxy.py
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
-# OpenShell requires a non-root workload user named 'sandbox' (it rejects root).
-# Give it /root as its home so the hermes state the entrypoint writes
-# (/root/.hermes) and the hermes install (/root/.local) are owned and found by it,
-# then hand it the runtime dirs. Compose still runs as root and can write these.
-RUN groupadd -g 1000 sandbox \
- && useradd -u 1000 -g 1000 -M -d /root -s /bin/bash sandbox \
- && chown -R 1000:1000 /root /opt/data /app
+# Only the runtime dirs need chowning now — /root is already sandbox-owned, so this
+# stays small and fast (skills + a handful of files), not the whole install tree.
+RUN chown -R 1000:1000 /opt/data /app
 
 WORKDIR /app
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
