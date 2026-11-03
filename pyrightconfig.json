@@ -1,5 +1,5 @@
 {
-  "include": ["gateway_server.py"],
+  "include": ["gateway_server.py", "llm_proxy.py"],
   "pythonVersion": "3.12",
   "typeCheckingMode": "strict",
   "venvPath": "forwarder",

@@ -54,6 +54,7 @@ Bank email notification          Bank SMS (iPhone → Saved Messages)
 | SMS listener | Pyrogram (MTProto user client) |
 | Forwarder | Python 3.12 |
 | Database | SQLite |
+| LLM observability | OpenObserve (token + latency metrics via an in-container proxy) |
 | Notifications | Telegram Bot API |
 
 ## Repository Structure
@@ -61,6 +62,9 @@ Bank email notification          Bank SMS (iPhone → Saved Messages)
 ```
 hushmoney/
 ├── AGENTS.md              # AI assistant rules, routing table, product direction
+├── Makefile               # common dev commands (make help)
+├── gateway_server.py      # HTTP gateway inside the Hermes container
+├── llm_proxy.py           # LLM telemetry proxy — token + latency → OpenObserve
 ├── forwarder/             # Sanitization service (Python 3.12)
 │   └── src/forwarder/
 │       ├── channels/      # telegram.py — bot webhook handler
@@ -117,11 +121,15 @@ On first run, `dev.sh` will:
 3. Save the session string to `.env` automatically
 4. Start Hermes inside an OpenShell sandbox and the forwarder via Podman
 
-**No OpenShell?** Run without the sandbox:
+**No OpenShell?** Run without the sandbox (this path includes LLM telemetry):
 
 ```bash
-./scripts/dev.sh --no-openshell
+make run                         # = ./scripts/dev.sh --no-openshell
+make run-no-telemetry            # skip the OpenObserve container
 ```
+
+With telemetry on, LLM token/latency metrics are available in OpenObserve at
+**http://127.0.0.1:5080**. Run `make help` for all commands.
 
 ### iPhone SMS Forwarding
 

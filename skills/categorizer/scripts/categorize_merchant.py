@@ -163,6 +163,8 @@ def main() -> None:
         headers={
             'Content-Type': 'application/json',
             'Authorization': f'Bearer {api_key}',
+            # Attributes this call in the LLM telemetry proxy (see llm_proxy.py).
+            'X-Hermes-Op': 'categorizer',
         },
         method='POST',
     )

@@ -2,10 +2,15 @@
 # HushMoney — local development launcher
 #
 # Usage:
-#   ./scripts/dev.sh                  # start with OpenShell sandbox (default)
-#   ./scripts/dev.sh --no-openshell   # plain podman compose (no sandboxing)
-#   ./scripts/dev.sh --down           # stop and remove everything
-#   ./scripts/dev.sh --logs           # tail logs from the running stack
+#   ./scripts/dev.sh                             # OpenShell sandbox (default)
+#   ./scripts/dev.sh --no-openshell              # plain podman compose, full stack
+#   ./scripts/dev.sh --no-openshell --no-telemetry # full stack without OpenObserve
+#   ./scripts/dev.sh --down                      # stop and remove everything
+#   ./scripts/dev.sh --logs                      # tail logs from the running stack
+#
+# The LLM telemetry proxy always runs inside the hermes container; --no-telemetry
+# only skips the OpenObserve sink (the proxy then forwards without recording).
+# Telemetry applies to --no-openshell mode only (OpenShell runs a prebuilt image).
 #
 # Prerequisites: .env filled in (cp .env.example .env && $EDITOR .env)
 
@@ -27,16 +32,20 @@ error() { echo -e "${RED}[error]${NC} $*" >&2; exit 1; }
 # ── Argument parsing ───────────────────────────────────────────────────────────
 
 USE_OPENSHELL=true
+TELEMETRY=true
 MODE=up
 
 for arg in "$@"; do
     case $arg in
         --no-openshell) USE_OPENSHELL=false ;;
+        --no-telemetry) TELEMETRY=false ;;
         --down)         MODE=down ;;
         --logs)         MODE=logs ;;
-        *) error "Unknown argument: $arg. Usage: dev.sh [--no-openshell] [--down] [--logs]" ;;
+        *) error "Unknown argument: $arg. Usage: dev.sh [--no-openshell] [--no-telemetry] [--down] [--logs]" ;;
     esac
 done
+
+export DOCKER_HOST="unix:///run/podman/podman.sock"
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -51,7 +60,8 @@ sandbox_exists() { openshell sandbox list 2>/dev/null | grep -q "$SANDBOX_NAME";
 
 if [[ "$MODE" == down ]]; then
     info "Stopping forwarder..."
-    DOCKER_HOST="unix:///run/podman/podman.sock" podman compose down 2>/dev/null || true
+    # --profile telemetry so the OpenObserve container is torn down too.
+    podman compose --profile telemetry down 2>/dev/null || true
 
     if sandbox_exists; then
         info "Stopping OpenShell sandbox..."
@@ -99,10 +109,28 @@ fi
 # ── Plain mode (--no-openshell) ────────────────────────────────────────────────
 
 if [[ "$USE_OPENSHELL" == false ]]; then
-    info "Starting stack without OpenShell sandbox..."
-    HERMES_UID=$(id -u) HERMES_GID=$(id -g) \
-        DOCKER_HOST="unix:///run/podman/podman.sock" podman compose up -d --build
-    info "Stack running. Logs: ./scripts/dev.sh --logs"
+    export HERMES_UID HERMES_GID
+    HERMES_UID=$(id -u)
+    HERMES_GID=$(id -g)
+
+    if [[ "$TELEMETRY" == true ]]; then
+        info "Starting full stack (with telemetry → OpenObserve)..."
+        podman compose --profile telemetry up -d --build
+    else
+        info "Starting full stack (telemetry sink disabled)..."
+        # Empty OPENOBSERVE_URL makes the in-container proxy a no-op recorder.
+        OPENOBSERVE_URL='' podman compose up -d --build
+    fi
+
+    echo ""
+    info "Stack running."
+    echo "  Logs:       ./scripts/dev.sh --logs"
+    echo "  Stop:       ./scripts/dev.sh --down"
+    [[ "$TELEMETRY" == true ]] && echo "  Telemetry:  http://127.0.0.1:5080  (OpenObserve)"
+    echo ""
+    echo "  Smoke test a transaction:"
+    echo "    make smoke   # or the curl in 'make help'"
+    echo ""
     exit 0
 fi
 

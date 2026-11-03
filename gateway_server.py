@@ -40,6 +40,10 @@ _NEBIUS_URL = (
 _NEBIUS_MODEL = os.getenv('HERMES_MODEL', 'nvidia/nemotron-3-super-120b-a12b')
 _KEEPALIVE_INTERVAL = int(os.getenv('NEBIUS_KEEPALIVE_INTERVAL', '240'))
 
+# Fields the store step (_store_and_categorize) requires; a payload missing any of these
+# is malformed and rejected with 400 before storage is attempted.
+_REQUIRED_FIELDS = ('amount', 'currency', 'date', 'transaction_type', 'account_type', 'channel')
+
 
 async def _run_script(*args: str) -> dict[str, Any] | None:
     proc = await asyncio.create_subprocess_exec(
@@ -201,6 +205,10 @@ async def _keepalive_loop() -> None:
                 f'Authorization: Bearer {api_key}',
                 '-H',
                 'Content-Type: application/json',
+                # Attributes keepalive pings in the LLM telemetry proxy (llm_proxy.py)
+                # so they can be filtered out of real-usage stats.
+                '-H',
+                'X-Hermes-Op: keepalive',
                 '-d',
                 payload,
                 stdout=asyncio.subprocess.DEVNULL,
@@ -229,7 +237,19 @@ async def gateway(request: Request) -> JSONResponse:
         if auth != f'Bearer {GATEWAY_SECRET}':
             return JSONResponse({'error': 'unauthorized'}, status_code=401)
 
-    data = await request.json()
+    try:
+        data = await request.json()
+    except (json.JSONDecodeError, ValueError):
+        return JSONResponse({'error': 'invalid JSON body'}, status_code=400)
+
+    # The downstream store step indexes these directly; reject malformed payloads with a
+    # 400 rather than letting a missing key surface as a 500 KeyError.
+    missing = [f for f in _REQUIRED_FIELDS if data.get(f) in (None, '')]
+    if missing:
+        log.warning('rejected payload missing required fields: %s', missing)
+        return JSONResponse(
+            {'error': 'missing required fields', 'fields': missing}, status_code=400
+        )
 
     transaction_type = data.get('transaction_type', 'transaction')
     amount = data.get('amount')

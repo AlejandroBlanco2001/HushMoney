@@ -3,17 +3,49 @@ title: Local Development
 description: Run the stack locally and develop against a live Hermes instance.
 ---
 
+## Make targets
+
+Common commands are wrapped in a `Makefile`. Run `make` (or `make help`) to list them:
+
+```bash
+make run              # full stack, with LLM telemetry (OpenObserve on :5080)
+make run-no-telemetry # full stack, without the OpenObserve sink
+make down             # stop and remove the stack
+make logs             # tail hermes + forwarder logs
+make smoke            # POST a test transaction to the running gateway
+
+make check            # everything CI runs: lint + format-check + typecheck + test
+make test             # run the test suite
+make lint / make fmt  # Ruff lint / auto-format
+make typecheck        # Pyright (strict)
+```
+
 ## Start the stack
 
-```bash
-HERMES_UID=$(id -u) HERMES_GID=$(id -g) docker compose up
-```
-
-SQLite data persists in the `hermes-data` Docker volume across restarts. To rebuild after a Dockerfile change:
+`make run` wraps `./scripts/dev.sh --no-openshell`, which builds and starts the stack via
+podman compose:
 
 ```bash
-docker compose up --build
+./scripts/dev.sh --no-openshell                 # full stack + telemetry
+./scripts/dev.sh --no-openshell --no-telemetry  # skip the OpenObserve container
 ```
+
+SQLite data persists in the `hermes-data` volume across restarts; rebuild after a Dockerfile
+change with `make run` again (`dev.sh` always passes `--build`).
+
+<Note>Bare `./scripts/dev.sh` runs Hermes inside an OpenShell sandbox from a prebuilt image —
+that path does **not** include the local telemetry proxy. Use `--no-openshell` for telemetry.</Note>
+
+## LLM telemetry
+
+All model calls inside the Hermes container are routed through `llm_proxy.py`, which records
+token usage and latency per call and pushes the metrics to **OpenObserve**. After `make run`,
+open **http://127.0.0.1:5080**, log in with `OPENOBSERVE_ROOT_EMAIL` / `OPENOBSERVE_ROOT_PASSWORD`,
+and inspect the `llm_usage` stream (grouped by `operation` and `model`).
+
+<Note>If no data appears, check `OPENOBSERVE_AUTH` — ingestion is fail-open, so a mismatched
+auth header silently drops events. It must be `Basic ` + base64 of `email:password` matching the
+root credentials.</Note>
 
 ## Run the forwarder standalone
 
@@ -57,7 +89,7 @@ docker compose logs -f hermes
 ## Run the tests
 
 ```bash
-cd forwarder && uv run pytest
+make test        # wraps scripts/run_tests.sh
 ```
 
 ## OpenShell sandbox (optional)

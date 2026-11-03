@@ -231,6 +231,30 @@ otherwise unparsed* notification to the LLM so it can infer structure. See
 - Once the pattern is stored, all subsequent messages from that bank are parsed
   deterministically and never reach the LLM.
 
+### LLM Telemetry Proxy (`llm_proxy.py`)
+
+A transparent pass-through that sits between every LLM caller inside the Hermes container
+and Nebius. All callers resolve their endpoint from `OPENAI_BASE_URL`, so pointing that one
+variable at the proxy (`http://127.0.0.1:8090/v1/`, done in `docker-entrypoint.sh`) captures
+**100% of model traffic** — the Hermes agent runtime, the `categorizer` skill, and the Nebius
+keepalive — including the agent binary, which emits no telemetry of its own.
+
+For each call it records **metadata only** — model, operation, token counts (prompt /
+completion / total), latency, and time-to-first-token for streamed replies — and pushes one
+event to [OpenObserve](https://openobserve.ai) for dashboards. Calls are attributed via an
+`X-Hermes-Op` header (`categorizer`, `keepalive`; untagged agent calls are `agent`).
+
+Two invariants hold absolutely:
+
+- **Fail-open.** A telemetry or upstream-metadata error never alters the proxied response;
+  the OpenObserve push is fire-and-forget, off the response path. If OpenObserve is down (or
+  disabled via an empty `OPENOBSERVE_URL`), the proxy still forwards normally and just drops
+  the events.
+- **Privacy.** Request and response bodies are never read for content, logged, or sent to the
+  sink — only the metadata above. The proxy sees post-sanitizer agent prompts and persists
+  counts only, preserving the [ADR-0002](adr/0002-privacy-boundary-redact-before-hermes.md)
+  boundary.
+
 ### Config (`config/`)
 
 ```
@@ -280,6 +304,8 @@ Hermes runs `debt_tracker` skill → stores entry in SQLite. No forwarder involv
 - **Elastic IP** keeps the instance address stable across restarts
 - **NVIDIA open models** (via Nebius Serverless) handle all LLM inference
 - **SQLite** is local to the Hermes agent's persistent storage volume on EC2
+- **OpenObserve** (optional, `telemetry` compose profile) stores per-call token/latency
+  metrics locally for LLM observability — localhost-only on port 5080
 - The user's Telegram bot is the sole communication channel in both directions
 
 ## Privacy Properties

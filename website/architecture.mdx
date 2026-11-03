@@ -107,6 +107,19 @@ The agent uses **NVIDIA Nemotron 3 Nano** (`nvidia/NVIDIA-Nemotron-3-Nano-30B-A3
 Nebius Serverless Endpoints for all LLM inference. Nemotron's MoE architecture (3B active / 30B
 total) keeps latency low for frequent categorization calls while retaining quality for reasoning tasks.
 
+### LLM Telemetry Proxy
+
+A transparent pass-through (`llm_proxy.py`) runs inside the Hermes container between every LLM
+caller and Nebius. Because all callers read `OPENAI_BASE_URL`, redirecting that one variable at
+the proxy captures **every** model call — the agent runtime, the `categorizer` skill, and the
+keepalive — and records metadata only: model, operation, token counts, latency, and
+time-to-first-token. Events are pushed to **OpenObserve** for dashboards.
+
+It is strictly fail-open (a telemetry error never affects a response) and privacy-preserving
+(request/response bodies are never read, logged, or sent to the sink — only the metrics). The
+OpenObserve sink is optional: it lives behind the `telemetry` compose profile and can be skipped
+with `dev.sh --no-telemetry`.
+
 ### SMS Listener
 
 `sms-listener` is a Pyrogram user client logged in as your Telegram account. It watches your
@@ -120,13 +133,15 @@ the forwarder's Telegram webhook.
 | `hermes-data` | Hermes SQLite (transactions, categories, debts, settings) | Hermes only |
 | `forwarder-data` | `forwarder.db` (learned patterns, fingerprints, proposals log) | Forwarder only |
 | `pattern-inbox` | Proposal JSON files written by Hermes, consumed by the forwarder | Both (Hermes writes, forwarder reads/deletes) |
+| `openobserve-data` | LLM token/latency metrics (parquet, local-disk mode) | OpenObserve only |
 
 ## Infrastructure
 
 | Component | Details |
 |---|---|
 | EC2 instance | t3.small, Amazon Linux 2023, Elastic IP |
-| Container runtime | Docker Compose (3 services: hermes, forwarder, sms-listener) |
+| Container runtime | Docker/Podman Compose (hermes, forwarder, sms-listener, two sqlite-web UIs, + optional openobserve) |
 | LLM inference | Nebius Serverless — no GPU on the instance |
 | Database | Two SQLite databases: `hermes-data` and `forwarder-data` volumes |
+| LLM observability | OpenObserve (optional `telemetry` profile) — token + latency metrics on :5080 |
 | Sandbox | NVIDIA OpenShell (optional, requires kernel 6.2+) |

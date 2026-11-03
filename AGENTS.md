@@ -56,7 +56,9 @@ hushmoney/
 │       ├── test_sanitizer.py
 │       ├── test_telegram.py
 │       └── test_telegram_config.py
+├── Makefile                   ← common dev commands (make help)
 ├── gateway_server.py          ← Starlette HTTP server inside the Hermes container
+├── llm_proxy.py               ← LLM telemetry proxy — token/latency metrics → OpenObserve
 ├── scripts/
 │   └── setup.sh               ← one-shot EC2 bootstrap + deploy
 ├── skills/                    ← custom Hermes skills loaded by the agent at runtime
@@ -91,6 +93,7 @@ hushmoney/
 | Infra | AWS EC2 t2.micro (free tier) |
 | Email ingestion | Gmail IMAP polling (App Password) |
 | HTTP gateway | Starlette + uvicorn (`gateway_server.py`) |
+| LLM telemetry | Transparent proxy (`llm_proxy.py`) → OpenObserve (token/latency metrics) |
 | Forwarder | Python 3.12 |
 | Database | SQLite (managed by Hermes) |
 | User notifications | Telegram |

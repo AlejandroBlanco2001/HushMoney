@@ -51,6 +51,14 @@ Routing:
   then invoke hushmoney/setup skill"
 fi
 
+# Start the LLM telemetry proxy and redirect all model traffic through it.
+# Every caller (agent runtime via config.yaml below, categorizer, keepalive) reads
+# OPENAI_BASE_URL, so this one redirect gives the proxy full coverage. The proxy
+# forwards to the real upstream captured in NEBIUS_UPSTREAM_URL. See llm_proxy.py.
+export NEBIUS_UPSTREAM_URL="${OPENAI_BASE_URL:-https://api.studio.nebius.ai/v1/}"
+export OPENAI_BASE_URL="http://127.0.0.1:8090/v1/"
+python3 -m uvicorn llm_proxy:app --host 127.0.0.1 --port 8090 &
+
 # Write hermes config — system_prompt is loaded at gateway startup (run.py:3273)
 cat > /root/.hermes/config.yaml << CONFEOF
 model:

@@ -46,6 +46,13 @@ services:
       - HUSHMONEY_DB=/opt/data/hushmoney.db
       - HUSHMONEY_INBOX=/opt/data/pattern-inbox
       - HUSHMONEY_REGISTRY=/opt/data/pattern-inbox/registry.json
+      # LLM telemetry: the in-container proxy pushes per-call token/latency events
+      # here. Set OPENOBSERVE_URL='' to make the proxy a no-op (telemetry disabled);
+      # the proxy still runs and forwards, it just stops recording. No depends_on —
+      # telemetry is best-effort and must never gate the app (the push is fail-open).
+      - OPENOBSERVE_URL=${OPENOBSERVE_URL-http://openobserve:5080}
+      - OPENOBSERVE_STREAM=llm_usage
+      - OPENOBSERVE_AUTH=${OPENOBSERVE_AUTH}
     init: true
     ports:
       - "8081:8080"
@@ -117,6 +124,25 @@ services:
     ports:
       - "127.0.0.1:8083:8080"
 
+  # LLM observability store + dashboards. Single-binary, local-disk (parquet) mode —
+  # the hermes container's telemetry proxy pushes token/latency events here.
+  # Localhost only; access via SSH tunnel like the sqlite-web UIs.
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve:latest
+    restart: unless-stopped
+    # Only starts when the 'telemetry' profile is active (default in dev.sh;
+    # skipped by `dev.sh --no-telemetry`).
+    profiles: ["telemetry"]
+    environment:
+      - ZO_LOCAL_MODE=true
+      - ZO_DATA_DIR=/data
+      - ZO_ROOT_USER_EMAIL=${OPENOBSERVE_ROOT_EMAIL}
+      - ZO_ROOT_USER_PASSWORD=${OPENOBSERVE_ROOT_PASSWORD}
+    volumes:
+      - openobserve-data:/data
+    ports:
+      - "127.0.0.1:5080:5080"
+
 volumes:
   hermes-data:
     external: true
@@ -127,3 +153,4 @@ volumes:
   pattern-inbox:
     external: true
     name: untyped_pattern-inbox
+  openobserve-data:

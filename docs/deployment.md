@@ -98,17 +98,28 @@ The script will:
 
 ## Local development
 
-Start the full stack locally (Docker or Podman):
+The quickest path is the `Makefile` (run `make help` for the full list):
+
+```sh
+make run              # full stack + LLM telemetry (OpenObserve on :5080)
+make run-no-telemetry # full stack without the OpenObserve sink
+make logs             # tail hermes + forwarder logs
+make down             # stop everything
+make check            # lint + format-check + typecheck + test (what CI runs)
+```
+
+`make run` wraps `./scripts/dev.sh --no-openshell`. To drive compose directly:
 
 ```sh
 # Docker
-HERMES_UID=$(id -u) HERMES_GID=$(id -g) docker compose up
+HERMES_UID=$(id -u) HERMES_GID=$(id -g) docker compose --profile telemetry up
 
 # Podman (NixOS)
-HERMES_UID=$(id -u) HERMES_GID=$(id -g) podman compose up
+HERMES_UID=$(id -u) HERMES_GID=$(id -g) podman compose --profile telemetry up
 ```
 
-SQLite data persists in the `hermes-data` volume across restarts.
+The `--profile telemetry` flag starts the OpenObserve container; omit it to run without the
+telemetry sink. SQLite data persists in the `hermes-data` volume across restarts.
 
 To rebuild after a Dockerfile change:
 
@@ -149,6 +160,17 @@ docker logs -f hermes
 # or
 podman logs -f hermes
 ```
+
+(`make smoke` runs the equivalent curl for you.)
+
+### LLM observability (OpenObserve)
+
+When started with the `telemetry` profile, all model calls are routed through an in-container
+proxy (`llm_proxy.py`) that records token usage and latency per call and pushes them to
+OpenObserve. Open **http://127.0.0.1:5080**, log in with `OPENOBSERVE_ROOT_EMAIL` /
+`OPENOBSERVE_ROOT_PASSWORD`, and query the `llm_usage` stream to build dashboards (tokens and
+p50/p95 latency grouped by `operation` and `model`). It is fail-open — if OpenObserve is down or
+disabled, the model calls are unaffected and events are simply dropped.
 
 ## OpenShell sandbox (optional — local dev + EC2)
 

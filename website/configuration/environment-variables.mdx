@@ -69,3 +69,17 @@ Only needed if you want to capture bank SMS via iPhone Shortcuts. See [iPhone SM
 | Variable | Default | Description |
 |---|---|---|
 | `HERMES_GATEWAY_URL` | `http://hermes:8080/gateway` | URL of the gateway inside the Docker network — only change this for non-Compose deployments |
+
+### LLM telemetry (OpenObserve)
+
+Only needed for LLM observability. The in-container proxy pushes per-call token/latency metrics
+to OpenObserve. Skip the whole sink with `./scripts/dev.sh --no-openshell --no-telemetry`.
+
+| Variable | Default | Description |
+|---|---|---|
+| `OPENOBSERVE_ROOT_EMAIL` | — | Admin login for the OpenObserve UI (http://127.0.0.1:5080) |
+| `OPENOBSERVE_ROOT_PASSWORD` | — | Admin password for the OpenObserve UI |
+| `OPENOBSERVE_AUTH` | — | Ingestion auth header: `Basic ` + base64 of `email:password`. Must match the root credentials or events are silently dropped |
+| `OPENOBSERVE_URL` | `http://openobserve:5080` | Where the proxy pushes events. Set empty to disable recording |
+
+<Note>Compute the auth header with: `printf 'Basic %s' "$(printf '%s' 'you@example.com:your-password' | base64)"`</Note>

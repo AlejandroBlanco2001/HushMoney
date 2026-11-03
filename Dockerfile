@@ -32,29 +32,14 @@ RUN hermes pm repair
 
 # Warm up the messaging-platform (telegram) deps at build time too: the gateway
 # installs `hermes-agent[telegram]` from PyPI on first run, which the sandbox
-# network policy blocks. Write the same platform config the entrypoint uses, then
-# run the gateway with a dummy token — it installs the deps into the committed env
-# and exits cleanly when the token is rejected.
-RUN printf '%s\n' \
-      'model:' \
-      '  default: nvidia/nemotron-3-super-120b-a12b' \
-      '  provider: openai' \
-      'platform_toolsets:' \
-      '  telegram:' \
-      '    - clarify' \
-      '    - cronjob' \
-      '    - file' \
-      '    - skills' \
-      '    - terminal' \
-      '    - todo' \
-      > /root/.hermes/config.yaml \
- && { TELEGRAM_BOT_TOKEN=000000:dummy hermes gateway run > /tmp/gw-warmup.log 2>&1 || true; } \
- && grep -q 'Installing Python dependencies' /tmp/gw-warmup.log \
- && ! grep -q 'Installing Python dependencies failed' /tmp/gw-warmup.log \
- && echo 'telegram deps committed'
+# network policy blocks. The warm-up runs the gateway with a dummy token to trigger
+# the install, then stops it deterministically — some hermes versions don't exit on
+# the rejected token and would otherwise hang the build. See the script for details.
+COPY scripts/warmup_telegram_deps.sh /usr/local/bin/warmup_telegram_deps.sh
+RUN sh /usr/local/bin/warmup_telegram_deps.sh
 
-# HTTP gateway server deps
-RUN python3 -m pip install --no-cache-dir --break-system-packages starlette uvicorn
+# HTTP gateway server + LLM telemetry proxy deps
+RUN python3 -m pip install --no-cache-dir --break-system-packages starlette uvicorn httpx
 
 # Bundle skills + config INTO the image. Under docker-compose these are
 # bind-mounted (and those mounts still override at runtime), but OpenShell
@@ -68,6 +53,7 @@ COPY config/accounts.md /app/accounts.md
 RUN mkdir -p /opt/data/pattern-inbox
 
 COPY gateway_server.py /app/gateway_server.py
+COPY llm_proxy.py /app/llm_proxy.py
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 

@@ -110,6 +110,16 @@ def test_needs_clarification_prompts_user(gw, monkeypatch):
     assert 'last time: food' in message
 
 
+def test_missing_required_field_returns_400(gw, monkeypatch):
+    monkeypatch.setattr(gw, 'GATEWAY_SECRET', '')
+    payload = {k: v for k, v in PAYLOAD.items() if k != 'date'}
+    resp = TestClient(gw.app).post('/gateway', json=payload)
+    assert resp.status_code == 400
+    body = resp.json()
+    assert body['error'] == 'missing required fields'
+    assert 'date' in body['fields']
+
+
 def test_hermes_send_failure_returns_500(gw, monkeypatch):
     monkeypatch.setattr(gw, 'GATEWAY_SECRET', '')
     monkeypatch.setattr(
